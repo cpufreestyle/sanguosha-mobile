@@ -1,0 +1,28 @@
+{
+  "name": "三国杀助手",
+  "short_name": "三国杀",
+  "description": "三国杀武将查询、卡牌效果、游戏规则助手",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#1a0a00",
+  "theme_color": "#1a0a00",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "zh-CN",
+  "categories": ["games", "utilities"],
+  "permissions": ["camera"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
