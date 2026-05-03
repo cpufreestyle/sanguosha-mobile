@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1a0a00" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="三国杀助手 - 武將查询、卡牌效果、游戏规则、拍照识别" />
+  <title>三国杀助手</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <style>
+    :root {
+      --bg: #1a0a00;
+      --bg2: #2a1505;
+      --bg3: #3a2010;
+      --gold: #c8a84b;
+      --gold2: #e8c86b;
+      --red: #c0392b;
+      --text: #f5e6d0;
+      --text2: #b8a080;
+      --border: #5a3015;
+      --card-bg: #2a1a08;
+      --blue: #2980b9;
+      --wei: #3498db;
+      --shu: #27ae60;
+      --wu: #f39c12;
+      --qun: #e74c3c;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      background: linear-gradient(135deg, #2a0d00 0%, #1a0800 100%);
+      border-bottom: 2px solid var(--gold);
+      padding: 12px 16px 10px;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 12px rgba(200,168,75,0.2);
+    }
+    .header-title {
+      text-align: center;
+      font-size: 20px;
+      font-weight: bold;
+      color: var(--gold);
+      letter-spacing: 3px;
+      text-shadow: 0 0 8px rgba(200,168,75,0.5);
+      line-height: 1.2;
+    }
+    .header-sub { font-size: 11px; color: var(--text2); text-align: center; letter-spacing: 1px; }
+
+    /* ===== TABS ===== */
+    .tabs {
+      display: flex;
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      flex: 1; text-align: center; padding: 12px 4px;
+      font-size: 14px; color: var(--text2);
+      cursor: pointer; transition: all 0.2s;
+      border-bottom: 3px solid transparent;
+      user-select: none;
+    }
+    .tab.active { color: var(--gold); border-bottom-color: var(--gold); background: var(--bg3); }
+    .tab:active { background: var(--bg3); }
+
+    /* ===== MAIN CONTENT ===== */
+    main { flex: 1; overflow-y: auto; padding-bottom: 70px; }
+
+    /* ===== SEARCH ===== */
+    .search-wrap { padding: 12px 12px 6px; }
+    .search-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 12px;
+    }
+    .search-box svg { flex-shrink: 0; color: var(--text2); }
+    #searchInput {
+      flex: 1; background: none; border: none; outline: none;
+      font-size: 15px; color: var(--text);
+    }
+    #searchInput::placeholder { color: var(--text2); }
+
+    /* ===== CATEGORY PILLS ===== */
+    .category-pills {
+      display: flex; gap: 6px; padding: 4px 12px 10px;
+      overflow-x: auto; scrollbar-width: none;
+    }
+    .category-pills::-webkit-scrollbar { display: none; }
+    .pill {
+      flex-shrink: 0; padding: 4px 12px; border-radius: 20px;
+      font-size: 12px; cursor: pointer; transition: all 0.2s;
+      border: 1px solid var(--border); color: var(--text2);
+      background: var(--bg2);
+    }
+    .pill.active, .pill:active {
+      background: var(--gold); color: #1a0a00;
+      border-color: var(--gold);
+    }
+
+    /* ===== PAGE PANELS ===== */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* ===== HERO LIST ===== */
+    .hero-list { padding: 0 12px; }
+    .hero-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 10px;
+      overflow: hidden; cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .hero-card:active, .hero-card.tap { border-color: var(--gold); }
+    .hero-card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+    }
+    .hero-avatar {
+      width: 44px; height: 44px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: bold;
+      flex-shrink: 0;
+    }
+    .faction-wei { background: rgba(52,152,219,0.2); color: var(--wei); }
+    .faction-shu { background: rgba(39,174,96,0.2); color: var(--shu); }
+    .faction-wu { background: rgba(243,156,18,0.2); color: var(--wu); }
+    .faction-qun { background: rgba(231,76,60,0.2); color: var(--qun); }
+    .hero-name { font-size: 16px; font-weight: bold; color: var(--text); }
+    .hero-title { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .hero-health { font-size: 11px; color: var(--gold); margin-top: 4px; }
+    .hero-arrow {
+      margin-left: auto; color: var(--text2);
+      transition: transform 0.2s;
+    }
+    .hero-card.open .hero-arrow { transform: rotate(180deg); }
+    .hero-skills {
+      display: none; padding: 0 14px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .hero-card.open .hero-skills { display: block; }
+    .skill-item {
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .skill-item:last-child { border-bottom: none; }
+    .skill-name {
+      font-size: 13px; font-weight: bold; color: var(--gold);
+      margin-bottom: 3px;
+    }
+    .skill-type {
+      display: inline-block; font-size: 10px;
+      background: var(--bg3); color: var(--text2);
+      padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+    }
+    .skill-desc { font-size: 13px; color: var(--text); line-height: 1.6; }
+
+    /* ===== CARD LIST ===== */
+    .card-section { padding: 0 12px; }
+    .section-title {
+      font-size: 13px; color: var(--gold); font-weight: bold;
+      padding: 14px 0 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .card-item {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 8px;
+      overflow: hidden; cursor: pointer;
+    }
+    .card-item:active { border-color: var(--gold); }
+    .card-header {
+      padding: 10px 14px; display: flex;
+      align-items: center; gap: 10px;
+    }
+    .card-icon {
+      width: 36px; height: 50px; border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: bold; flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    .basic-card { background: linear-gradient(135deg,#c0392b,#922b21); color: #fff; }
+    .trick-card { background: linear-gradient(135deg,#8e44ad,#6c3483); color: #fff; }
+    .equip-card { background: linear-gradient(135deg,#2980b9,#1a5276); color: #fff; }
+    .horse-card { background: linear-gradient(135deg,#16a085,#0e6655); color: #fff; }
+    .card-name { font-size: 15px; font-weight: bold; }
+    .card-type-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    .card-arrow { margin-left: auto; color: var(--text2); }
+    .card-detail {
+      display: none; padding: 0 14px 14px;
+      border-top: 1px solid var(--border);
+      font-size: 13px; line-height: 1.6; color: var(--text);
+    }
+    .card-item.open .card-detail { display: block; }
+    .card-item.open .card-arrow { transform: rotate(180deg); }
+    .card-note { margin-top: 6px; color: var(--text2); font-size: 12px; }
+
+    /* ===== RULES ===== */
+    .rule-section { padding: 0 12px; }
+    .rule-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .rule-header {
+      padding: 12px 14px; font-size: 14px; font-weight: bold;
+      color: var(--text); cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .rule-header:active { background: var(--bg3); }
+    .rule-body {
+      display: none; padding: 0 14px 14px;
+      font-size: 13px; line-height: 1.8; color: var(--text);
+    }
+    .rule-card.open .rule-body { display: block; }
+    .rule-card.open .rule-arrow { transform: rotate(180deg); }
+    .faq-q { color: var(--gold); font-weight: bold; margin: 8px 0 4px; font-size: 13px; }
+    .faq-a { color: var(--text); line-height: 1.7; font-size: 13px; }
+
+    /* ===== ASK (Q&A) ===== */
+    #askPage { padding: 14px 12px; }
+    .ask-intro {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+      font-size: 13px; color: var(--text2); line-height: 1.8;
+      margin-bottom: 12px;
+    }
+    .ask-intro strong { color: var(--gold); }
+    .ask-examples {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .ask-example {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px;
+      font-size: 13px; cursor: pointer;
+      display: flex; align-items: center; gap: 8px;
+      transition: border-color 0.2s;
+    }
+    .ask-example:active { border-color: var(--gold); }
+    .ask-example-icon { color: var(--gold); font-size: 16px; }
+    .ask-result {
+      background: var(--card-bg); border: 1px solid var(--gold);
+      border-radius: 10px; padding: 14px; margin-top: 12px;
+      font-size: 14px; line-height: 1.8; color: var(--text);
+    }
+    .ask-result .skill-name-badge {
+      color: var(--gold); font-weight: bold;
+    }
+
+    /* ===== INSTALL BANNER ===== */
+    .install-banner {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(135deg, #1a0800, #2a1000);
+      border-top: 2px solid var(--gold);
+      padding: 10px 16px;
+      display: flex; align-items: center; gap: 12px;
+      z-index: 200;
+      transform: translateY(100%);
+      transition: transform 0.3s;
+    }
+    .install-banner.show { transform: translateY(0); }
+    .install-banner-text { flex: 1; font-size: 13px; color: var(--text2); }
+    .install-banner-text strong { color: var(--gold); display: block; font-size: 14px; }
+    .install-btn {
+      background: var(--gold); color: #1a0a00;
+      border: none; border-radius: 20px;
+      padding: 8px 18px; font-size: 13px; font-weight: bold;
+      cursor: pointer;
+    }
+    .install-btn:active { opacity: 0.8; }
+    .close-banner {
+      background: none; border: none; color: var(--text2);
+      font-size: 18px; cursor: pointer; padding: 4px;
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty {
+      text-align: center; padding: 60px 20px;
+      color: var(--text2); font-size: 14px;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+
+    /* ===== NOT FOUND ===== */
+    .not-found {
+      text-align: center; padding: 40px 20px;
+      color: var(--text2); font-size: 14px;
+    }
+
+    /* ===== Scrollbar ===== */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ===== CAMERA PAGE ===== */
+    .camera-wrap { padding: 12px; }
+    .camera-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 3/4;
+      background: var(--bg2);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    #cameraVideo {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .camera-overlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .camera-placeholder {
+      text-align: center; color: var(--text2);
+      font-size: 14px;
+    }
+    .camera-icon { font-size: 48px; margin-bottom: 8px; opacity: 0.6; }
+    .camera-scan-line {
+      position: absolute; left: 0; right: 0;
+      height: 2px; background: var(--gold);
+      opacity: 0.5;
+      animation: scanLine 2s ease-in-out infinite;
+    }
+    @keyframes scanLine {
+      0%, 100% { top: 20%; }
+      50% { top: 80%; }
+    }
+    .camera-corner {
+      position: absolute; width: 20px; height: 20px;
+      border-color: var(--gold); border-style: solid;
+    }
+    .camera-corner.tl { top: 8px; left: 8px; border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+    .camera-corner.tr { top: 8px; right: 8px; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+    .camera-corner.bl { bottom: 8px; left: 8px; border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+    .camera-corner.br { bottom: 8px; right: 8px; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+    .camera-controls {
+      display: flex; gap: 10px;
+      margin-bottom: 12px;
+    }
+    .cam-btn {
+      flex: 1; border: none; border-radius: 10px;
+      padding: 12px; font-size: 14px; font-weight: bold;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .cam-btn:active { transform: scale(0.96); }
+    .cam-btn-primary {
+      background: var(--gold); color: #1a0a00;
+    }
+    .cam-btn-secondary {
+      background: var(--bg3); color: var(--text);
+      border: 1px solid var(--border);
+    }
+    /* Recognize result card */
+    .recog-card {
+      background: var(--bg2); border: 2px solid var(--gold);
+      border-radius: 12px; padding: 16px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; } }
+    .recog-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .recog-badge {
+      background: var(--gold); color: #1a0a00;
+      padding: 3px 10px; border-radius: 12px;
+      font-size: 11px; font-weight: bold;
+    }
+    .recog-confidence { font-size: 11px; color: var(--text2); }
+    .recog-name { font-size: 18px; font-weight: bold; color: var(--gold); margin-bottom: 4px; }
+    .recog-desc { font-size: 13px; color: var(--text); line-height: 1.7; }
+    .recog-skill {
+      margin-top: 10px; padding: 10px;
+      background: var(--bg3); border-radius: 8px;
+      border-left: 3px solid var(--gold);
+    }
+    .recog-skill-name { font-size: 13px; font-weight: bold; color: var(--gold); margin-bottom: 3px; }
+    .recog-skill-desc { font-size: 12px; color: var(--text); line-height: 1.6; }
+    .recog-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .recog-action-btn {
+      flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg3); color: var(--text); font-size: 13px;
+      cursor: pointer; text-align: center;
+    }
+    .recog-action-btn:active { border-color: var(--gold); }
+    /* Loading state */
+    .recog-loading {
+      text-align: center; padding: 30px;
+      color: var(--text2); font-size: 14px;
+    }
+    .recog-loading-dot { animation: blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    /* Error state */
+    .recog-error {
+      background: rgba(192,57,43,0.15); border: 1px solid var(--red);
+      border-radius: 10px; padding: 14px;
+      font-size: 13px; color: var(--red);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">⚔️ 三国杀助手</div>
+  <div class="header-sub">武将 · 卡牌 · 规则</div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="heroes">🎴 武将</div>
+  <div class="tab" data-tab="cards">🃏 卡牌</div>
+  <div class="tab" data-tab="camera">📷 识别</div>
+  <div class="tab" data-tab="rules">📜 规则</div>
+  <div class="tab" data-tab="ask">💬 问答</div>
+</div>
+
+<main>
+  <!-- ===== 武将页 ===== -->
+  <div class="page active" id="heroesPage">
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="heroSearch" type="text" placeholder="搜索武将…" autocomplete="off" />
+      </div>
+    </div>
+    <div class="category-pills" id="factionPills">
+      <div class="pill active" data-faction="all">全部</div>
+      <div class="pill" data-faction="蜀">蜀</div>
+      <div class="pill" data-faction="魏">魏</div>
+      <div class="pill" data-faction="吴">吴</div>
+      <div class="pill" data-faction="群">群</div>
+    </div>
+    <div class="hero-list" id="heroList"></div>
+  </div>
+
+  <!-- ===== 卡牌页 ===== -->
+  <div class="page" id="cardsPage">
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="cardSearch" type="text" placeholder="搜索卡牌…" autocomplete="off" />
+      </div>
+    </div>
+    <div class="category-pills" id="cardTypePills">
+      <div class="pill active" data-type="all">全部</div>
+      <div class="pill" data-type="basic">基本牌</div>
+      <div class="pill" data-type="trick">锦囊牌</div>
+      <div class="pill" data-type="equipment">装备牌</div>
+    </div>
+    <div id="cardList"></div>
+  </div>
+
+  <!-- ===== 摄像头识别页 ===== -->
+  <div class="page" id="cameraPage">
+    <div class="camera-wrap">
+      <!-- 取景框 -->
+      <div class="camera-frame" id="cameraFrame">
+        <video id="cameraVideo" autoplay playsinline muted></video>
+        <canvas id="cameraCanvas" style="display:none"></canvas>
+        <div class="camera-overlay" id="cameraOverlay">
+          <div class="camera-placeholder" id="cameraPlaceholder">
+            <div class="camera-icon">📷</div>
+            <div>点击下方按钮打开摄像头</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="camera-controls">
+        <button class="cam-btn cam-btn-secondary" id="switchCameraBtn" onclick="switchCamera()">🔄 切换摄像头</button>
+        <button class="cam-btn cam-btn-primary" id="captureBtn" onclick="captureAndRecognize()">📸 拍照识别</button>
+      </div>
+
+      <!-- 识别结果 -->
+      <div id="recognizeResult"></div>
+    </div>
+  </div>
+
+  <!-- ===== 规则页 ===== -->
+  <div class="page" id="rulesPage">
+    <div class="rule-section" id="rulesList"></div>
+  </div>
+
+  <!-- ===== 问答页 ===== -->
+  <div class="page" id="askPage">
+    <div class="ask-intro">
+      输入任意三国杀相关问题，我会帮你解答！<br/><br/>
+      <strong>试试这样问：</strong>
+    </div>
+    <div class="ask-examples" id="askExamples"></div>
+    <div id="askResult"></div>
+  </div>
+</main>
+
+<!-- Install Banner -->
+<div class="install-banner" id="installBanner">
+  <div class="install-banner-text">
+    <strong>安装到桌面</strong>
+    快速访问，无需浏览器
+  </div>
+  <button class="install-btn" id="installBtn">安装</button>
+  <button class="close-banner" id="closeBanner">✕</button>
+</div>
+
+<script src="data.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+</script>
+</body>
+</html>
