@@ -303,6 +303,115 @@
 
     /* ===== CAMERA PAGE ===== */
     .camera-wrap { padding: 12px; }
+
+    /* ===== TEAM RECOMMENDATION PAGE ===== */
+    #teamPage { padding: 12px; }
+    .team-selected-hero {
+      background: var(--bg2); border: 2px solid var(--gold);
+      border-radius: 12px; padding: 14px;
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 14px; cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .team-selected-hero:active { border-color: var(--gold2); }
+    .team-selected-name { font-size: 18px; font-weight: bold; color: var(--gold); }
+    .team-selected-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+    .team-tip-box {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+      font-size: 13px; color: var(--text); line-height: 1.7;
+    }
+    .team-tip-label { font-weight: bold; color: var(--gold); margin-bottom: 4px; font-size: 13px; }
+    .team-section-title {
+      font-size: 14px; font-weight: bold; color: var(--gold);
+      margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    }
+    .team-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; margin-bottom: 8px;
+      overflow: hidden; cursor: pointer;
+    }
+    .team-card:active { border-color: var(--gold); }
+    .team-card-header {
+      padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+    }
+    .team-hero-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: bold; flex-shrink: 0;
+    }
+    .team-hero-name { font-size: 15px; font-weight: bold; color: var(--text); }
+    .team-hero-sub { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    .team-hero-arrow { margin-left: auto; color: var(--text2); transition: transform 0.2s; }
+    .team-card.open .team-hero-arrow { transform: rotate(180deg); }
+    .team-card-body { display: none; padding: 0 14px 14px; border-top: 1px solid var(--border); }
+    .team-card.open .team-card-body { display: block; }
+    .team-reason {
+      background: var(--bg3); border-radius: 8px; padding: 10px;
+      margin-bottom: 8px; font-size: 13px; color: var(--text); line-height: 1.6;
+    }
+    .team-card-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .team-card-item {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; padding: 3px 8px; font-size: 12px; color: var(--text2);
+    }
+    .team-empty {
+      text-align: center; padding: 50px 20px;
+      color: var(--text2); font-size: 14px;
+    }
+    .team-empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
+    .team-cards-recommend {
+      display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+    }
+    .team-card-recommend-item {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 6px; padding: 4px 10px; font-size: 12px; color: var(--text);
+    }
+    /* Hero picker modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 500; display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: var(--bg2); border: 2px solid var(--gold);
+      border-radius: 16px; width: 100%; max-width: 400px;
+      max-height: 80vh; display: flex; flex-direction: column;
+    }
+    .modal-header {
+      padding: 14px 16px; display: flex; align-items: center;
+      border-bottom: 1px solid var(--border);
+      gap: 10px;
+    }
+    .modal-title { flex: 1; font-size: 16px; font-weight: bold; color: var(--gold); }
+    .modal-close {
+      background: none; border: none; color: var(--text2);
+      font-size: 20px; cursor: pointer; padding: 4px;
+    }
+    .modal-search { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .modal-search-box {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px;
+    }
+    .modal-search-box input {
+      flex: 1; background: none; border: none; outline: none;
+      font-size: 14px; color: var(--text);
+    }
+    .modal-search-box input::placeholder { color: var(--text2); }
+    .modal-hero-list {
+      flex: 1; overflow-y: auto; padding: 8px 12px;
+      max-height: 50vh;
+    }
+    .modal-hero-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 6px; cursor: pointer;
+      border-radius: 8px;
+    }
+    .modal-hero-item:active { background: var(--bg3); }
+    .modal-hero-name { font-size: 15px; font-weight: bold; color: var(--text); }
+    .modal-hero-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
     .camera-frame {
       position: relative;
       width: 100%;
@@ -419,6 +528,7 @@
   <div class="tab" data-tab="cards">🃏 卡牌</div>
   <div class="tab" data-tab="camera">📷 识别</div>
   <div class="tab" data-tab="rules">📜 规则</div>
+  <div class="tab" data-tab="team">⚔️ 配将</div>
   <div class="tab" data-tab="ask">💬 问答</div>
 </div>
 
@@ -489,6 +599,17 @@
     <div class="rule-section" id="rulesList"></div>
   </div>
 
+  <!-- ===== 配将推荐页 ===== -->
+  <div class="page" id="teamPage">
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="teamHeroSearch" type="text" placeholder="选择主将..." autocomplete="off" readonly onclick="showHeroPicker()" />
+      </div>
+    </div>
+    <div id="teamResult"></div>
+  </div>
+
   <!-- ===== 问答页 ===== -->
   <div class="page" id="askPage">
     <div class="ask-intro">
@@ -499,6 +620,23 @@
     <div id="askResult"></div>
   </div>
 </main>
+
+<!-- Hero Picker Modal -->
+<div class="modal-overlay" id="heroPickerModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">选择主将</div>
+      <button class="modal-close" onclick="closeHeroPicker()">✕</button>
+    </div>
+    <div class="modal-search">
+      <div class="modal-search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="modalHeroSearch" type="text" placeholder="搜索武将..." autocomplete="off" />
+      </div>
+    </div>
+    <div class="modal-hero-list" id="modalHeroList"></div>
+  </div>
+</div>
 
 <!-- Install Banner -->
 <div class="install-banner" id="installBanner">
