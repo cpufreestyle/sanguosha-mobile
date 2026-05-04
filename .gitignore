@@ -1,0 +1,26 @@
+# Build outputs
+android_build/
+build/
+dist/
+*.apk
+*.jar
+*.dex
+*.class
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+add_heroes.py
+check_heroes.py
+expand_heroes.py
+
+# Gradle
+.gradle/
+gradle/
+*.gradle
+
+# Android
+local.properties
+*.log

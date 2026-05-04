@@ -65,6 +65,9 @@ document.querySelectorAll('.tab').forEach(tab => {
     } else {
       stopCamera();
     }
+    if (currentTab === 'team') {
+      renderTeamResult();
+    }
   });
 });
 
@@ -378,6 +381,159 @@ function getAnswer(q) {
   }
 
   return '抱歉，我暂时没有找到相关内容。试试搜索武将名（如"关羽"）或卡牌名（如"南蛮入侵"）来获取详细信息！';
+}
+
+// ===== TEAM RECOMMENDATION =====
+let selectedHero = null;
+
+function showHeroPicker() {
+  const modal = document.getElementById('heroPickerModal');
+  const list = document.getElementById('modalHeroList');
+
+  renderModalHeroes(HEROES);
+  modal.classList.add('show');
+
+  document.getElementById('modalHeroSearch').addEventListener('input', e => {
+    const s = e.target.value.toLowerCase();
+    const filtered = HEROES.filter(h =>
+      h.name.toLowerCase().includes(s) || h.title.toLowerCase().includes(s)
+    );
+    renderModalHeroes(filtered);
+  });
+}
+
+function renderModalHeroes(heroes) {
+  const list = document.getElementById('modalHeroList');
+  if (heroes.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text2);font-size:14px">没有找到匹配的武将</div>';
+    return;
+  }
+  list.innerHTML = heroes.map(h => `
+    <div class="modal-hero-item" onclick="selectHero('${h.name}')">
+      <div class="hero-avatar faction-${h.faction}" style="width:38px;height:38px;font-size:16px">${h.name[0]}</div>
+      <div>
+        <div class="modal-hero-name">${h.name}</div>
+        <div class="modal-hero-sub">${h.title} · ${h.faction} · ❤️${h.health}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function closeHeroPicker() {
+  document.getElementById('heroPickerModal').classList.remove('show');
+  document.getElementById('modalHeroSearch').value = '';
+}
+
+function selectHero(name) {
+  closeHeroPicker();
+  selectedHero = HEROES.find(h => h.name === name);
+  renderTeamResult();
+}
+
+function renderTeamResult() {
+  const container = document.getElementById('teamResult');
+
+  if (!selectedHero) {
+    container.innerHTML = `
+      <div class="team-empty">
+        <div class="team-empty-icon">⚔️</div>
+        <div>点击上方框选择你的主将</div>
+        <div style="font-size:12px;margin-top:6px;color:var(--text2)">我会为你推荐配合的武将和卡牌</div>
+      </div>
+    `;
+    return;
+  }
+
+  const synergy = SYNERGIES[selectedHero.name];
+
+  // Hero tags
+  const tags = HERO_TAGS[selectedHero.name] || [];
+
+  container.innerHTML = `
+    <div class="team-selected-hero" onclick="showHeroPicker()">
+      <div class="hero-avatar faction-${selectedHero.faction}" style="width:50px;height:50px;font-size:24px">${selectedHero.name[0]}</div>
+      <div>
+        <div class="team-selected-name">${selectedHero.name}</div>
+        <div class="team-selected-sub">${selectedHero.title} · ${selectedHero.faction} · ❤️${selectedHero.health}体力</div>
+        ${tags.length > 0 ? `<div style="margin-top:4px">${tags.map(t => `<span class="pill" style="padding:2px 8px;font-size:10px;margin-right:4px">${t}</span>`).join('')}</div>` : ''}
+      </div>
+      <div style="margin-left:auto;color:var(--text2);font-size:12px">▼</div>
+    </div>
+
+    ${synergy ? `
+      <div class="team-tip-box">
+        <div class="team-tip-label">💡 出牌建议</div>
+        <div>${synergy.tip}</div>
+      </div>
+
+      <div class="team-section-title">🤝 推荐配合武将</div>
+      ${synergy.partners.map(pName => {
+        const partner = HEROES.find(h => h.name === pName);
+        if (!partner) return '';
+        const partnerSynergy = SYNERGIES[pName];
+        return `
+          <div class="team-card" onclick="toggleTeamCard(this)">
+            <div class="team-card-header">
+              <div class="team-hero-avatar faction-${partner.faction}">${partner.name[0]}</div>
+              <div>
+                <div class="team-hero-name">${partner.name}</div>
+                <div class="team-hero-sub">${partner.title} · ${partner.faction} · ❤️${partner.health}体力</div>
+              </div>
+              <div class="team-hero-arrow">▼</div>
+            </div>
+            <div class="team-card-body">
+              ${partnerSynergy ? `<div class="team-reason">💡 ${partnerSynergy.reason}</div>` : ''}
+              ${partner.skills.map(s => `
+                <div style="margin-top:6px">
+                  <span style="font-size:12px;color:var(--gold);font-weight:bold">【${s.name}】</span>
+                  <span style="font-size:11px;color:var(--text2)">${s.type}</span>
+                  <div style="font-size:12px;color:var(--text);margin-top:2px">${s.description}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+
+      <div class="team-section-title" style="margin-top:16px">🃏 推荐卡牌</div>
+      <div class="team-cards-recommend">
+        ${synergy.cards.map(c => `<div class="team-card-recommend-item">${c}</div>`).join('')}
+      </div>
+
+      <div style="margin-top:14px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--gold)">
+        <div style="font-size:12px;font-weight:bold;color:var(--gold)">📌 阵容搭配思路</div>
+        <div style="font-size:13px;color:var(--text);margin-top:6px;line-height:1.7">${synergy.reason}</div>
+      </div>
+    ` : `
+      <div class="team-tip-box">
+        <div class="team-tip-label">💡 武将特点</div>
+        <div>${selectedHero.skills.map(s => `【${s.name}】${s.description}`).join('\n')}</div>
+      </div>
+      <div class="team-section-title">🎴 基本信息</div>
+      <div class="team-card" style="cursor:default">
+        <div class="team-card-header">
+          <div class="team-hero-avatar faction-${selectedHero.faction}" style="width:48px;height:48px;font-size:22px">${selectedHero.name[0]}</div>
+          <div>
+            <div class="team-hero-name">${selectedHero.name}</div>
+            <div class="team-hero-sub">${selectedHero.title} · ❤️${selectedHero.health}体力</div>
+          </div>
+        </div>
+        <div class="team-card-body" style="display:block">
+          ${selectedHero.skills.map(s => `
+            <div style="margin-bottom:8px">
+              <span style="font-size:13px;color:var(--gold);font-weight:bold">【${s.name}】</span>
+              <span style="font-size:11px;color:var(--text2)">${s.type}</span>
+              <div style="font-size:13px;color:var(--text);margin-top:2px;line-height:1.6">${s.description}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `}
+  `;
+}
+
+function toggleTeamCard(card) {
+  card.classList.toggle('open');
 }
 
 // ===== INSTALL BANNER =====
