@@ -109,6 +109,24 @@
       border-color: var(--gold);
     }
 
+    /* Tag pills - smaller */
+    .tag-pills { padding-top: 2px; padding-bottom: 8px; }
+    .tag-pills .pill {
+      padding: 3px 8px; font-size: 11px;
+      border-radius: 14px;
+    }
+
+    /* Hero tag badges */
+    .hero-tags {
+      display: flex; flex-wrap: wrap; gap: 4px;
+      margin-top: 4px;
+    }
+    .hero-tag {
+      font-size: 10px; padding: 1px 6px; border-radius: 10px;
+      background: rgba(200,168,75,0.15); color: var(--gold);
+      border: 1px solid rgba(200,168,75,0.3);
+    }
+
     /* ===== PAGE PANELS ===== */
     .page { display: none; }
     .page.active { display: block; }
@@ -547,6 +565,31 @@
       <div class="pill" data-faction="魏">魏</div>
       <div class="pill" data-faction="吴">吴</div>
       <div class="pill" data-faction="群">群</div>
+    </div>
+    <div class="category-pills tag-pills" id="tagPills">
+      <div class="pill active" data-tag="all">全部</div>
+      <div class="pill" data-tag="爆发">💥爆发</div>
+      <div class="pill" data-tag="控制">🎯控制</div>
+      <div class="pill" data-tag="辅助">💊辅助</div>
+      <div class="pill" data-tag="防御">🛡️防御</div>
+      <div class="pill" data-tag="摸牌">🃏摸牌</div>
+      <div class="pill" data-tag="菜刀">⚔️菜刀</div>
+      <div class="pill" data-tag="卖血">🩸卖血</div>
+      <div class="pill" data-tag="精准">🎯精准</div>
+      <div class="pill" data-tag="判定">🔮判定</div>
+      <div class="pill" data-tag="干扰">👋干扰</div>
+      <div class="pill" data-tag="拆牌">🗑️拆牌</div>
+      <div class="pill" data-tag="延时">⏰延时</div>
+      <div class="pill" data-tag="免疫">✨免疫</div>
+      <div class="pill" data-tag="转换">🔄转换</div>
+      <div class="pill" data-tag="反伤">⚡反伤</div>
+      <div class="pill" data-tag="改判">🔮改判</div>
+      <div class="pill" data-tag="治疗">💚治疗</div>
+      <div class="pill" data-tag="群伤">💥群伤</div>
+      <div class="pill" data-tag="蓄爆">📦蓄爆</div>
+      <div class="pill" data-tag="制衡">⚖️制衡</div>
+      <div class="pill" data-tag="强制伤害">💀强伤</div>
+      <div class="pill" data-tag="给牌">🤝给牌</div>
     </div>
     <div class="hero-list" id="heroList"></div>
   </div>

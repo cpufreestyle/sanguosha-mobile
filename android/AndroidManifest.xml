@@ -4,6 +4,8 @@
     android:versionCode="2"
     android:versionName="1.1.0">
 
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34"></uses-sdk>
+
     <!-- Camera permission for AI vision recognition -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

@@ -1,74 +1,92 @@
-﻿// 版本号
-const VERSION = "1.2.0";
+// 版本号
+const VERSION = "1.3.0";
 
 // 三国杀助手 - 游戏数据
 const HEROES = [
-  {name:"刘备",title:"仁德之君",faction:"蜀",health:4,skills:[{name:"仁德",type:"主动技",description:"出牌阶段，你可以将任意张手牌交给其他角色，然后你于此阶段内给出第二张'仁德'牌时，你回复1点体力。"}]},
-  {name:"关羽",title:"美髯公",faction:"蜀",health:4,skills:[{name:"武圣",type:"锁定技",description:"你可以将一张红色牌当【杀】使用或打出。"}]},
-  {name:"张飞",title:"万夫不当",faction:"蜀",health:4,skills:[{name:"咆哮",type:"锁定技",description:"你使用【杀】无次数限制。"}]},
-  {name:"诸葛亮",title:"迟暮的丞相",faction:"蜀",health:3,skills:[{name:"观星",type:"准备阶段技",description:"准备阶段，你可以观看牌堆顶的X张牌（X为存活角色数且最多为5），然后将其中任意数量的牌置于牌堆顶，其余置于牌堆底。"},{name:"空城",type:"锁定技",description:"若你没有手牌，你不能成为【杀】或【决斗】的目标。"}]},
-  {name:"赵云",title:"少年将军",faction:"蜀",health:4,skills:[{name:"龙胆",type:"转换技",description:"你可以将一张【杀】当【闪】使用或打出，或将一张【闪】当【杀】使用或打出。"}]},
-  {name:"曹操",title:"魏武帝",faction:"魏",health:4,skills:[{name:"奸雄",type:"主动技",description:"当你受到伤害后，你可以获得对你造成伤害的牌。"},{name:"护驾",type:"主公技",description:"当你需要使用或打出【闪】时，你可以令其他魏势力角色选择是否打出一张【闪】。"}]},
-  {name:"司马懿",title:"狼顾之鬼",faction:"魏",health:3,skills:[{name:"反馈",type:"主动技",description:"当你受到伤害后，你可以获得伤害来源的一张牌。"},{name:"鬼才",type:"主动技",description:"当一名角色的判定牌生效前，你可以打出一张手牌代替之。"}]},
-  {name:"孙权",title:"年轻的贤君",faction:"吴",health:4,skills:[{name:"制衡",type:"主动技",description:"出牌阶段限一次，你可以弃置任意张牌，然后摸等量的牌。"},{name:"救援",type:"主公技",description:"当吴势力角色使用【桃】指定你为目标时，你额外回复1点体力。"}]},
-  {name:"吕布",title:"无双",faction:"群",health:4,skills:[{name:"无双",type:"锁定技",description:"当你使用【杀】指定目标后，目标角色需依次使用两张【闪】才能抵消此【杀】；当你使用【决斗】指定目标后，或成为一名角色使用【决斗】的目标后，该角色需依次打出两张【杀】才能响应此【决斗】。"}]},
-  {name:"貂蝉",title:"绝世的舞姬",faction:"群",health:3,skills:[{name:"离间",type:"主动技",description:"出牌阶段限一次，你可以弃置一张牌，令一名男性角色视为对另一名男性角色使用一张【决斗】。"},{name:"闭月",type:"结束阶段技",description:"结束阶段，你可以摸一张牌。"}]}
+  // 蜀势力
+  {name:"刘备",title:"仁德之君",faction:"蜀",health:4,tags:["辅助","摸牌"],skills:[{name:"仁德",type:"主动技",description:"出牌阶段，你可以将任意张手牌交给其他角色，然后你于此阶段内给出第二张'仁德'牌时，你回复1点体力。"}]},
+  {name:"关羽",title:"美髯公",faction:"蜀",health:4,tags:["菜刀"],skills:[{name:"武圣",type:"锁定技",description:"你可以将一张红色牌当【杀】使用或打出。"}]},
+  {name:"张飞",title:"万夫不当",faction:"蜀",health:4,tags:["爆发","菜刀"],skills:[{name:"咆哮",type:"锁定技",description:"你使用【杀】无次数限制。"}]},
+  {name:"诸葛亮",title:"迟暮的丞相",faction:"蜀",health:3,tags:["防御","控制"],skills:[{name:"观星",type:"准备阶段技",description:"准备阶段，你可以观看牌堆顶的X张牌（X为存活角色数且最多为5），然后将其中任意数量的牌置于牌堆顶，其余置于牌堆底。"},{name:"空城",type:"锁定技",description:"若你没有手牌，你不能成为【杀】或【决斗】的目标。"}]},
+  {name:"赵云",title:"少年将军",faction:"蜀",health:4,tags:["防御","转换"],skills:[{name:"龙胆",type:"转换技",description:"你可以将一张【杀】当【闪】使用或打出，或将一张【闪】当【杀】使用或打出。"}]},
+  {name:"马超",title:"一骑当千",faction:"蜀",health:4,tags:["爆发","菜刀"],skills:[{name:"马术",type:"锁定技",description:"你计算与其他角色的距离时-1。"},{name:"铁骑",type:"主动技",description:"当你使用【杀】指定一名角色后，你可以进行判定，若结果为红色，此【杀】不可被【闪】响应。"}]},
+  {name:"黄忠",title:"老当益壮",faction:"蜀",health:4,tags:["爆发","精准"],skills:[{name:"烈弓",type:"锁定技",description:"当你使用【杀】指定一名角色后，若其手牌数大于或等于你的体力值，此【杀】不可被【闪】响应。"}]},
+  // 魏势力
+  {name:"曹操",title:"魏武帝",faction:"魏",health:4,tags:["摸牌","卖血"],skills:[{name:"奸雄",type:"主动技",description:"当你受到伤害后，你可以获得对你造成伤害的牌。"},{name:"护驾",type:"主公技",description:"当你需要使用或打出【闪】时，你可以令其他魏势力角色选择是否打出一张【闪】。"}]},
+  {name:"司马懿",title:"狼顾之鬼",faction:"魏",health:3,tags:["控制","防御","改判"],skills:[{name:"反馈",type:"主动技",description:"当你受到伤害后，你可以获得伤害来源的一张牌。"},{name:"鬼才",type:"主动技",description:"当一名角色的判定牌生效前，你可以打出一张手牌代替之。"}]},
+  {name:"夏侯惇",title:"啖睛的怒狼",faction:"魏",health:4,tags:["卖血","反伤"],skills:[{name:"刚烈",type:"主动技",description:"当你受到伤害后，你可以进行判定，若结果不为红桃，则伤害来源受到1点伤害或让你摸两张牌。"}]},
+  {name:"张辽",title:"前将军",faction:"魏",health:4,tags:["控制","摸牌","干扰"],skills:[{name:"突袭",type:"摸牌阶段技",description:"摸牌阶段，你可以放弃摸牌，改为获得至多两名其他角色的各一张手牌。"}]},
+  {name:"许褚",title:"虎痴",faction:"魏",health:4,tags:["爆发","菜刀","卖血"],skills:[{name:"裸衣",type:"摸牌阶段技",description:"摸牌阶段，你可以放弃摸牌，改为展示牌堆顶的三张牌，获得基本牌和武器牌。此回合【杀】伤害+1。"}]},
+  {name:"郭嘉",title:"早终的先知",faction:"魏",health:3,tags:["辅助","卖血","摸牌"],skills:[{name:"天妒",type:"锁定技",description:"当你的判定牌生效后，你获得此牌。"},{name:"遗计",type:"主动技",description:"当你受到伤害后，你可以观看牌堆顶的两张牌，将其交给一名角色。"}]},
+  {name:"甄姬",title:"薄幸的美人",faction:"魏",health:3,tags:["辅助","摸牌","判定"],skills:[{name:"倾国",type:"锁定技",description:"你可以将一张黑色手牌当【闪】使用或打出。"},{name:"洛神",type:"准备阶段技",description:"准备阶段，你可以进行判定，若结果为黑色，你获得此牌，重复直到出现红色。"}]},
+  // 吴势力
+  {name:"孙权",title:"年轻的贤君",faction:"吴",health:4,tags:["摸牌","制衡"],skills:[{name:"制衡",type:"主动技",description:"出牌阶段限一次，你可以弃置任意张牌，然后摸等量的牌。"},{name:"救援",type:"主公技",description:"当吴势力角色使用【桃】指定你为目标时，你额外回复1点体力。"}]},
+  {name:"甘宁",title:"锦帆游侠",faction:"吴",health:4,tags:["爆发","控制","拆牌"],skills:[{name:"奇袭",type:"锁定技",description:"你可以将一张黑色牌当【过河拆桥】使用。"}]},
+  {name:"吕蒙",title:"白衣渡江",faction:"吴",health:4,tags:["蓄爆"],skills:[{name:"克己",type:"锁定技",description:"若你未于出牌阶段使用或打出过【杀】，你可以跳过弃牌阶段。"}]},
+  {name:"黄盖",title:"轻身为国",faction:"吴",health:4,tags:["爆发","卖血"],skills:[{name:"苦肉",type:"主动技",description:"出牌阶段，你可以失去1点体力，然后摸两张牌。"}]},
+  {name:"周瑜",title:"大都督",faction:"吴",health:3,tags:["爆发","摸牌"],skills:[{name:"英姿",type:"锁定技",description:"摸牌阶段，你多摸一张牌。"},{name:"反间",type:"主动技",description:"出牌阶段限一次，展示一张手牌并交给一名角色，猜错则受到1点伤害。"}]},
+  {name:"大乔",title:"矜持之花",faction:"吴",health:3,tags:["控制","防御","延时"],skills:[{name:"国色",type:"锁定技",description:"你可以将一张方块牌当【乐不思蜀】使用。"},{name:"流离",type:"主动技",description:"当你成为【杀】的目标时，你可以弃置一张牌，将此【杀】转移给其他角色。"}]},
+  {name:"陆逊",title:"儒生雄才",faction:"吴",health:3,tags:["控制","防御","免疫"],skills:[{name:"谦逊",type:"锁定技",description:"你不能成为【乐不思蜀】或【顺手牵羊】的目标。"},{name:"连营",type:"主动技",description:"当你失去最后一张手牌时，你可以摸两张牌。"}]},
+  // 群势力
+  {name:"吕布",title:"无双",faction:"群",health:4,tags:["爆发","菜刀"],skills:[{name:"无双",type:"锁定技",description:"当你使用【杀】指定目标后，目标角色需依次使用两张【闪】才能抵消此【杀】；当你使用【决斗】指定目标后，或成为一名角色使用【决斗】的目标后，该角色需依次打出两张【杀】才能响应此【决斗】。"}]},
+  {name:"貂蝉",title:"绝世的舞姬",faction:"群",health:3,tags:["控制","强制伤害"],skills:[{name:"离间",type:"主动技",description:"出牌阶段限一次，你可以弃置一张牌，令一名男性角色视为对另一名男性角色使用一张【决斗】。"},{name:"闭月",type:"结束阶段技",description:"结束阶段，你可以摸一张牌。"}]},
+  {name:"华佗",title:"神医",faction:"群",health:3,tags:["辅助","治疗"],skills:[{name:"急救",type:"主动技",description:"你的回合外，你可以将一张红色牌当【桃】使用。"},{name:"青囊",type:"主动技",description:"出牌阶段限一次，你可以弃置一张手牌，令一名角色回复1点体力。"}]},
+  {name:"袁绍",title:"高贵的名门",faction:"群",health:4,tags:["爆发","群伤"],skills:[{name:"乱击",type:"主动技",description:"你可以将两张相同花色的手牌当【万箭齐发】使用。"},{name:"血裔",type:"主公技",description:"锁定技，你的手牌上限+2，群势力角色的手牌上限+1。"}]}
 ];
 
-  // 蜀势力 - 新增
-  ,{name:"马超",title:"一骑当千",faction:"蜀",health:4,skills:[{name:"马术",type:"锁定技",description:"你计算与其他角色的距离时-1。"},{name:"铁骑",type:"主动技",description:"当你使用【杀】指定一名角色后，你可以进行判定，若结果为红色，此【杀】不可被【闪】响应。"}]}
-  ,{name:"黄忠",title:"老当益壮",faction:"蜀",health:4,skills:[{name:"烈弓",type:"锁定技",description:"当你使用【杀】指定一名角色后，若其手牌数大于或等于你的体力值，此【杀】不可被【闪】响应。"}]}
-  // 魏势力 - 新增
-  ,{name:"夏侯惇",title:"啖睛的怒狼",faction:"魏",health:4,skills:[{name:"刚烈",type:"主动技",description:"当你受到伤害后，你可以进行判定，若结果不为红桃，则伤害来源受到1点伤害或让你摸两张牌。"}]}
-  ,{name:"张辽",title:"前将军",faction:"魏",health:4,skills:[{name:"突袭",type:"摸牌阶段技",description:"摸牌阶段，你可以放弃摸牌，改为获得至多两名其他角色的各一张手牌。"}]}
-  ,{name:"许褚",title:"虎痴",faction:"魏",health:4,skills:[{name:"裸衣",type:"摸牌阶段技",description:"摸牌阶段，你可以放弃摸牌，改为展示牌堆顶的三张牌，获得基本牌和武器牌。此回合【杀】伤害+1。"}]}
-  ,{name:"郭嘉",title:"早终的先知",faction:"魏",health:3,skills:[{name:"天妒",type:"锁定技",description:"当你的判定牌生效后，你获得此牌。"},{name:"遗计",type:"主动技",description:"当你受到伤害后，你可以观看牌堆顶的两张牌，将其交给一名角色。"}]}
-  ,{name:"甄姬",title:"薄幸的美人",faction:"魏",health:3,skills:[{name:"倾国",type:"锁定技",description:"你可以将一张黑色手牌当【闪】使用或打出。"},{name:"洛神",type:"准备阶段技",description:"准备阶段，你可以进行判定，若结果为黑色，你获得此牌，重复直到出现红色。"}]}
-  // 吴势力 - 新增
-  ,{name:"甘宁",title:"锦帆游侠",faction:"吴",health:4,skills:[{name:"奇袭",type:"锁定技",description:"你可以将一张黑色牌当【过河拆桥】使用。"}]}
-  ,{name:"吕蒙",title:"白衣渡江",faction:"吴",health:4,skills:[{name:"克己",type:"锁定技",description:"若你未于出牌阶段使用或打出过【杀】，你可以跳过弃牌阶段。"}]}
-  ,{name:"黄盖",title:"轻身为国",faction:"吴",health:4,skills:[{name:"苦肉",type:"主动技",description:"出牌阶段，你可以失去1点体力，然后摸两张牌。"}]}
-  ,{name:"周瑜",title:"大都督",faction:"吴",health:3,skills:[{name:"英姿",type:"锁定技",description:"摸牌阶段，你多摸一张牌。"},{name:"反间",type:"主动技",description:"出牌阶段限一次，展示一张手牌并交给一名角色，猜错则受到1点伤害。"}]}
-  ,{name:"大乔",title:"矜持之花",faction:"吴",health:3,skills:[{name:"国色",type:"锁定技",description:"你可以将一张方块牌当【乐不思蜀】使用。"},{name:"流离",type:"主动技",description:"当你成为【杀】的目标时，你可以弃置一张牌，将此【杀】转移给其他角色。"}]}
-  ,{name:"陆逊",title:"儒生雄才",faction:"吴",health:3,skills:[{name:"谦逊",type:"锁定技",description:"你不能成为【乐不思蜀】或【顺手牵羊】的目标。"},{name:"连营",type:"主动技",description:"当你失去最后一张手牌时，你可以摸两张牌。"}]}
-  // 群势力 - 新增
-  ,{name:"华佗",title:"神医",faction:"群",health:3,skills:[{name:"急救",type:"主动技",description:"你的回合外，你可以将一张红色牌当【桃】使用。"},{name:"青囊",type:"主动技",description:"出牌阶段限一次，你可以弃置一张手牌，令一名角色回复1点体力。"}]}
-  ,{name:"袁绍",title:"高贵的名门",faction:"群",health:4,skills:[{name:"乱击",type:"主动技",description:"你可以将两张相同花色的手牌当【万箭齐发】使用。"},{name:"血裔",type:"主公技",description:"锁定技，你的手牌上限+2，群势力角色的手牌上限+1。"}]}
+// ===== 标签筛选数据 =====
+const ALL_TAGS = [
+  {key:"爆发", label:"💥 爆发", desc:"一回合内造成大量伤害"},
+  {key:"控制", label:"🎯 控制", desc:"限制对手行动"},
+  {key:"辅助", label:"💊 辅助", desc:"支援队友"},
+  {key:"防御", label:"🛡️ 防御", desc:"生存能力强"},
+  {key:"摸牌", label:"🃏 摸牌", desc:"手牌资源丰富"},
+  {key:"菜刀", label:"⚔️ 菜刀", desc:"依赖杀输出"},
+  {key:"卖血", label:"🩸 卖血", desc:"受伤触发技能"},
+  {key:"精准", label:"🎯 精准", desc:"杀不可被闪响应"},
+  {key:"判定", label:"🔮 判定", desc:"依赖判定机制"},
+  {key:"干扰", label:"👋 干扰", desc:"干扰对手手牌"},
+  {key:"拆牌", label:"🗑️ 拆牌", desc:"破坏对手手牌/装备"},
+  {key:"延时", label:"⏰ 延时", desc:"延时锦囊控制"},
+  {key:"免疫", label:"✨ 免疫", desc:"免疫特定效果"},
+  {key:"转换", label:"🔄 转换", desc:"牌类转换技能"},
+  {key:"反伤", label:"⚡ 反伤", desc:"受伤反制对手"},
+  {key:"改判", label:"🔮 改判", desc:"修改判定结果"},
+  {key:"治疗", label:"💚 治疗", desc:"回复体力技能"},
+  {key:"群伤", label:"💥 群伤", desc:"群体伤害技能"},
+  {key:"蓄爆", label:"📦 蓄爆", desc:"蓄牌一击必杀"},
+  {key:"制衡", label:"⚖️ 制衡", desc:"换牌优化手牌"},
+  {key:"强制伤害", label:"💀 强伤", desc:"强制造成伤害"},
+  {key:"给牌", label:"🤝 给牌", desc:"分配手牌给队友"}
+];
+
 // ===== SYNERGY & TEAM RECOMMENDATION DATA =====
 const HERO_TAGS = {
-  // 爆发型：能在一回合内造成大量伤害
+  '刘备': ['辅助', '摸牌', '给牌'],
+  '关羽': ['菜刀'],
   '张飞': ['爆发', '菜刀'],
+  '诸葛亮': ['防御', '控制'],
+  '赵云': ['防御', '转换'],
+  '马超': ['爆发', '菜刀'],
   '黄忠': ['爆发', '精准'],
-  '许褚': ['爆发', '菜刀'],
-  '甘宁': ['爆发', '控制'],
+  '曹操': ['摸牌', '卖血'],
+  '司马懿': ['控制', '防御', '改判', '反伤'],
+  '夏侯惇': ['卖血', '反伤'],
+  '张辽': ['控制', '摸牌', '干扰'],
+  '许褚': ['爆发', '菜刀', '卖血'],
+  '郭嘉': ['辅助', '卖血', '摸牌'],
+  '甄姬': ['辅助', '摸牌', '判定'],
+  '孙权': ['摸牌', '制衡'],
+  '甘宁': ['爆发', '控制', '拆牌'],
+  '吕蒙': ['蓄爆'],
   '黄盖': ['爆发', '卖血'],
   '周瑜': ['爆发', '摸牌'],
-  '袁绍': ['爆发', '群伤'],
+  '大乔': ['控制', '防御', '延时'],
+  '陆逊': ['控制', '防御', '免疫'],
   '吕布': ['爆发', '菜刀'],
-  // 控制型：限制对手行动
-  '甘宁': ['控制', '拆牌'],
-  '张辽': ['控制', '摸牌干扰'],
-  '大乔': ['控制', '延时'],
-  '陆逊': ['控制', '免疫'],
   '貂蝉': ['控制', '强制伤害'],
-  '司马懿': ['控制', '改判'],
-  // 辅助型：支援队友
-  '刘备': ['辅助', '给牌'],
   '华佗': ['辅助', '治疗'],
-  '郭嘉': ['辅助', '卖血'],
-  '甄姬': ['辅助', '判定'],
-  // 防御型：生存能力强
-  '诸葛亮': ['防御', '空城'],
-  '赵云': ['防御', '转换'],
-  '司马懿': ['防御', '反伤'],
-  '陆逊': ['防御', '免疫'],
-  '大乔': ['防御', '转移'],
-  // 摸牌型：手牌资源丰富
-  '周瑜': ['摸牌'],
-  '孙权': ['摸牌', '制衡'],
-  '张辽': ['摸牌', '干扰'],
-  '郭嘉': ['摸牌', '卖血'],
-  '刘备': ['摸牌', '辅助']
+  '袁绍': ['爆发', '群伤']
 };
 
 // 武将配合关系（key英雄推荐配合的其他英雄）
@@ -225,7 +243,7 @@ const SYNERGIES = {
   }
 };
 
-// 通用推荐数据（没有特定数据时使用）
+// 通用推荐数据
 const GENERAL_TIP = {
   cards: ['杀', '闪', '桃'],
   tip: '根据武将技能选择合适的配合'
@@ -253,8 +271,6 @@ const TEAM_COMPOSITIONS = {
     icons: ['🛡️', '💚', '🔄']
   }
 };
-
-// ===== SYNERGY & TEAM RECOMMENDATION DATA =====
 
 const CARDS = {
   basic_cards: [
