@@ -1,7 +1,7 @@
 // 三国杀助手 - 移动端应用逻辑
 
 let currentTab = 'heroes';
-let heroFilter = { faction: 'all', search: '' };
+let heroFilter = { faction: 'all', search: '', tag: 'all' };
 let cardFilter = { type: 'all', search: '' };
 let deferredPrompt = null;
 
@@ -80,6 +80,10 @@ function renderHeroes(heroes = HEROES) {
       const s = heroFilter.search.toLowerCase();
       if (!h.name.toLowerCase().includes(s) && !h.title.toLowerCase().includes(s)) return false;
     }
+    if (heroFilter.tag !== 'all') {
+      const tags = h.tags || HERO_TAGS[h.name] || []; // Support both new .tags and legacy HERO_TAGS
+      if (!tags.includes(heroFilter.tag)) return false;
+    }
     return true;
   });
 
@@ -88,13 +92,16 @@ function renderHeroes(heroes = HEROES) {
     return;
   }
 
-  list.innerHTML = filtered.map(h => `
-    <div class="hero-card" onclick="toggleHero(this)">
+  list.innerHTML = filtered.map(h => {
+    const tags = h.tags || HERO_TAGS[h.name] || []; // Support both
+    const tagsHtml = tags.length > 0 ? `<div class="hero-tags">${tags.slice(0, 5).map(t => `<span class="hero-tag">${t}</span>`).join('')}</div>` : ''; // Show up to 5 tags
+    return `<div class="hero-card" onclick="toggleHero(this)" data-hero="${h.name}" data-tags="${tags.join(',')}">
       <div class="hero-card-header">
         <div class="hero-avatar faction-${h.faction}">${h.name[0]}</div>
         <div>
           <div class="hero-name">${h.name} <span style="font-size:11px;color:var(--text2)">${h.title}</span></div>
           <div class="hero-health">⚔️ ${h.faction} &nbsp; ❤️ ${h.health}体力</div>
+          ${tagsHtml}
         </div>
         <div class="hero-arrow">▼</div>
       </div>
@@ -106,8 +113,8 @@ function renderHeroes(heroes = HEROES) {
           </div>
         `).join('')}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function toggleHero(card) {
@@ -125,6 +132,16 @@ document.getElementById('factionPills').addEventListener('click', e => {
   document.querySelectorAll('#factionPills .pill').forEach(p => p.classList.remove('active'));
   pill.classList.add('active');
   heroFilter.faction = pill.dataset.faction;
+  renderHeroes();
+});
+
+// Tag pills
+document.getElementById('tagPills').addEventListener('click', e => {
+  const pill = e.target.closest('.pill');
+  if (!pill) return;
+  document.querySelectorAll('#tagPills .pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  heroFilter.tag = pill.dataset.tag;
   renderHeroes();
 });
 

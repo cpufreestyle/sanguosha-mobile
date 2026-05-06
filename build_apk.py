@@ -11,6 +11,16 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+# Set JAVA_HOME for d8.bat (must be set before subprocess calls)
+if not os.environ.get('JAVA_HOME'):
+    _jdk = Path(r'D:\jdk17')
+    if _jdk.exists():
+        os.environ['JAVA_HOME'] = str(_jdk)
+    else:
+        _jdk2 = Path(r'D:\qclaw-workspace\jdk-17.0.10+7')
+        if _jdk2.exists():
+            os.environ['JAVA_HOME'] = str(_jdk2)
+
 # Fix Windows console encoding
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -26,20 +36,21 @@ BUILD_DIR = APP_DIR / "android_build"
 ASSETS_DIR = ANDROID_DIR / "assets"
 
 # Android SDK 路径
-ANDROID_HOME = Path(os.environ.get("ANDROID_HOME", r"D:\Android"))
-BUILD_TOOLS = ANDROID_HOME / "build-tools" / "34.0.0"
-JDK_HOME = ANDROID_HOME / "jdk" / "openjdk-17"
-PLATFORM = ANDROID_HOME / "platforms" / "android-34"
+ANDROID_HOME = Path(os.environ.get("ANDROID_HOME", r"D:\qclaw-workspace\android-sdk"))
+BUILD_TOOLS = ANDROID_HOME / "build-tools" / "33.0.1"
+JDK_HOME = Path(os.environ.get("JAVA_HOME", r"D:\qclaw-workspace\jdk-17.0.10+7"))
+PLATFORM = ANDROID_HOME / "platforms" / "android-33"
 
 # 工具路径
 AAPT2 = BUILD_TOOLS / "aapt2.exe"
+AAPT = ANDROID_HOME / "build-tools" / "33.0.1" / "aapt.exe"
 AAPT2_COMPILE = BUILD_TOOLS / "aapt2"
-D8 = BUILD_TOOLS / "d8.bat"
-APKSIGNER = BUILD_TOOLS / "apksigner.bat"
+D8_JAR = BUILD_TOOLS / "lib" / "d8.jar"
+APKSIGNER_JAR = BUILD_TOOLS / "lib" / "apksigner.jar"
+JAVA = JDK_HOME / "bin" / "java.exe"
 ZIPALIGN = BUILD_TOOLS / "zipalign.exe"
 JAVAC = JDK_HOME / "bin" / "javac.exe"
 JAR = JDK_HOME / "bin" / "jar.exe"
-JAVA = JDK_HOME / "bin" / "java.exe"
 
 ANDROID_JAR = PLATFORM / "android.jar"
 ANDROID_MANIFEST = ANDROID_DIR / "AndroidManifest.xml"
@@ -180,12 +191,15 @@ def build_apk():
     cmd = [str(JAR), "cf", str(jar_file), "-C", str(CLASSES_DIR), ".", "-C", str(BUILD_DIR), "manifest.txt"]
     run(cmd)
 
-    # Convert to DEX using d8.bat (d8.jar may not exist)
+    # Convert to DEX using d8.jar directly
     DEX_FILE = DEX_DIR / "classes.dex"
-    cmd = [str(D8),
+    cmd = [str(JAVA),
+        "-Xmx1024M", "-Xss1m",
+        "-cp", str(D8_JAR),
+        "com.android.tools.r8.D8",
         str(jar_file),
         "--output", str(DEX_DIR),
-        "--min-api", "34"
+        "--min-api", "33"
     ]
     run(cmd)
 
@@ -202,6 +216,8 @@ def build_apk():
         "-o", str(LINKED_APK),
         "-I", str(ANDROID_JAR),
         "--manifest", str(ANDROID_MANIFEST),
+        "--min-sdk-version", "21",
+        "--target-sdk-version", "34",
         "--auto-add-overlay",
     ] + [str(f) for f in flat_files]
     try:
@@ -212,6 +228,8 @@ def build_apk():
             str(AAPT2), "link",
             "-o", str(LINKED_APK),
             "-I", str(ANDROID_JAR),
+            "--min-sdk-version", "21",
+            "--target-sdk-version", "34",
             "--manifest", str(ANDROID_MANIFEST),
         ] + [str(f) for f in flat_files]
         run(cmd)
@@ -273,7 +291,9 @@ def build_apk():
     input_apk = str(unaligned) if (unaligned and unaligned.exists()) else str(FINAL_UNALIGNED)
     if KEYSTORE.exists():
         sign_cmd = [
-            str(APKSIGNER), "sign",
+            str(JAVA),
+            "-jar", str(APKSIGNER_JAR),
+            "sign",
             "--ks", str(KEYSTORE),
             "--ks-pass", f"pass:{KEYSTORE_PASS}",
             "--key-pass", f"pass:{KEY_PASS}",
