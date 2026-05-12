@@ -547,6 +547,7 @@
   <div class="tab" data-tab="camera">📷 识别</div>
   <div class="tab" data-tab="rules">📜 规则</div>
   <div class="tab" data-tab="team">⚔️ 配将</div>
+  <div class="tab" data-tab="advice">💡 出牌</div>
   <div class="tab" data-tab="ask">💬 问答</div>
 </div>
 
@@ -651,6 +652,70 @@
       </div>
     </div>
     <div id="teamResult"></div>
+  </div>
+
+  <!-- ===== 出牌建议页 ===== -->
+  <div class="page" id="advicePage">
+    <!-- Step 1: 选择武将 -->
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="adviceHeroSearch" type="text" placeholder="① 选择你的武将..." autocomplete="off" readonly onclick="showAdviceHeroPicker()" />
+      </div>
+    </div>
+
+    <!-- Step 2: 选择手牌 -->
+    <div id="adviceHandSection" style="display:none;padding:0 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 8px">
+        <div style="font-size:13px;font-weight:bold;color:var(--gold)">② 选择手牌</div>
+        <button id="adviceCameraBtn" onclick="openAdviceCamera()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:4px 10px;border-radius:14px;font-size:11px;cursor:pointer">📷 拍照识别</button>
+      </div>
+      <div id="adviceHandCards" class="category-pills" style="flex-wrap:wrap;gap:6px"></div>
+      <div id="adviceSelectedHand" style="margin-top:8px;font-size:12px;color:var(--text2);min-height:24px"></div>
+    </div>
+
+    <!-- Step 3: 局势选择 -->
+    <div id="adviceSituationSection" style="display:none;padding:0 12px">
+      <div style="font-size:13px;font-weight:bold;color:var(--gold);margin:10px 0 8px">③ 当前局势</div>
+      <div class="category-pills" id="adviceSituationPills" style="padding-bottom:4px">
+        <div class="pill active" data-situation="default">通用</div>
+        <div class="pill" data-situation="early">开局</div>
+        <div class="pill" data-situation="mid">中盘</div>
+        <div class="pill" data-situation="late">残局</div>
+      </div>
+    </div>
+
+    <!-- 建议/摄像头区域 -->
+    <div id="adviceContent" style="padding:0 12px">
+      <div id="adviceResult"></div>
+    </div>
+  </div>
+
+  <!-- 出牌拍照模态框 -->
+  <div class="modal-overlay" id="adviceCameraModal">
+    <div class="modal-box" style="max-height:85vh">
+      <div class="modal-header">
+        <div class="modal-title">📷 拍照识别手牌</div>
+        <button class="modal-close" onclick="closeAdviceCamera()">✕</button>
+      </div>
+      <div style="position:relative;width:100%;background:#000;border-radius:8px;overflow:hidden">
+        <video id="adviceCameraVideo" autoplay playsinline muted style="width:100%;display:block"></video>
+        <canvas id="adviceCameraCanvas" style="display:none"></canvas>
+        <div id="adviceCameraOverlay" style="position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none">
+          <div class="camera-scan-line"></div>
+          <div class="camera-corner tl"></div>
+          <div class="camera-corner tr"></div>
+          <div class="camera-corner bl"></div>
+          <div class="camera-corner br"></div>
+          <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8)">将手牌放入框内</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="cam-btn" onclick="switchAdviceCamera()" style="flex:1">🔄 翻转</button>
+        <button class="cam-btn cam-btn-primary" id="adviceCaptureBtn" onclick="captureAdviceCards()" style="flex:2">📸 拍照识别手牌</button>
+      </div>
+      <div id="adviceRecognizeResult" style="margin-top:10px"></div>
+    </div>
   </div>
 
   <!-- ===== 问答页 ===== -->

@@ -1,4 +1,4 @@
-// AI 视觉识别配置
+﻿// AI 视觉识别配置
 const VISION_CONFIG = {
   // 支持的视觉模型，按优先级排列
   providers: [
@@ -16,11 +16,19 @@ const VISION_CONFIG = {
       model: 'gpt-4o-mini',
       type: 'openai',
       apiKey: '' // 在此填入你的 OpenAI API Key
+    },
+    {
+      name: 'openrouter',
+      label: 'OpenRouter (DeepSeek VL)',
+      endpoint: 'https://openrouter.ai/api/v1/chat/completions',
+      model: 'deepseek-ai/deepseek-vl2:latest',
+      type: 'openai',
+      apiKey: 'YOUR_OPENROUTER_API_KEY'
     }
   ],
 
   // 当前使用的 provider 名称
-  activeProvider: 'ollama',
+  activeProvider: 'openrouter',
 
   // 超时时间（毫秒）
   timeout: 30000
