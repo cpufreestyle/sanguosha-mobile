@@ -1,4 +1,4 @@
-﻿// AI 视觉识别配置
+// AI 视觉识别配置
 const VISION_CONFIG = {
   // 支持的视觉模型，按优先级排列
   providers: [
@@ -23,7 +23,7 @@ const VISION_CONFIG = {
       endpoint: 'https://openrouter.ai/api/v1/chat/completions',
       model: 'deepseek-ai/deepseek-vl2:latest',
       type: 'openai',
-      apiKey: 'YOUR_OPENROUTER_API_KEY'
+      apiKey: '' // 填入你的 OpenRouter API Key
     }
   ],
 

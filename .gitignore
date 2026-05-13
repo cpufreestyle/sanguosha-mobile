@@ -1,3 +1,6 @@
+# 敏感配置
+config.js
+
 # Build outputs
 android_build/
 build/
