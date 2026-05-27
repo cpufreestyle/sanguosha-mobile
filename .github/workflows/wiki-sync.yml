@@ -1,0 +1,43 @@
+name: Auto-sync Wiki
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate Wiki
+        run: |
+          mkdir -p wiki
+          cat > wiki/index.md << 'EOF'
+          # 📁 三国杀 Mobile Wiki
+
+          > 自动生成 · 最后更新: $(date '+%Y-%m-%d %H:%M')
+
+          ## 项目信息
+
+          - **最新版本**: v1.3.0 (APK ~48.9KB)
+          - **GitHub**: https://github.com/cpufreestyle/sanguosha-mobile
+
+          ## 最近提交
+
+          EOF
+          git log --oneline -10 --format="- %s (%h) · %ad" --date=short >> wiki/index.md
+          echo "" >> wiki/index.md
+          echo "---" >> wiki/index.md
+          echo "" >> wiki/index.md
+          echo "_由 GitHub Actions 自动生成_" >> wiki/index.md
+
+      - name: Commit & Push
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add wiki/
+          git diff --cached --quiet || exit 0
+          git commit -m "docs(wiki): auto-sync [skip ci]"
+          git push
