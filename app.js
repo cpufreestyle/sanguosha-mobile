@@ -10,41 +10,104 @@ let cameraStream = null;
 let currentFacing = 'environment'; // 'environment' = 后置, 'user' = 前置
 let cameraActive = false;
 
+// ===== API STATE =====
+let SGS_API_BASE = window.SGS_API || 'http://localhost:8100';
+let SGS_API_ENABLED = window.SGS_USE_API !== false;
+let SGS_API_AVAILABLE = false; // 运行时检测
+
 // ===== FACTS CHECK (for local fallback) =====
 const FACTS_MAP = {};
 
-// Build facts map from HEROES and CARDS
-(function buildFacts() {
-  HEROES.forEach(h => {
-    FACTS_MAP[h.name] = {
-      type: 'hero',
-      data: h,
-      name: h.name
+// Build facts map from HEROES and CARDS (from data.js fallback)
+function buildFacts() {
+  FACTS_MAP.length = 0;
+  Object.keys(FACTS_MAP).forEach(k => delete FACTS_MAP[k]);
+  if (typeof HEROES !== 'undefined') {
+    HEROES.forEach(h => {
+      FACTS_MAP[h.name] = { type: 'hero', data: h, name: h.name };
+    });
+  }
+  if (typeof CARDS !== 'undefined') {
+    const allCards = [
+      ...CARDS.basic_cards.map(c => ({ ...c, _cat: 'basic' })),
+      ...CARDS.trick_cards.map(c => ({ ...c, _cat: 'trick' })),
+      ...CARDS.equipment_cards.map(c => ({ ...c, _cat: 'equipment' }))
+    ];
+    allCards.forEach(c => {
+      FACTS_MAP[c.name] = { type: 'card', data: c, name: c.name };
+    });
+  }
+}
+
+// Initial build from data.js (fallback)
+buildFacts();
+
+// ===== API LOADER =====
+async function loadFromAPI() {
+  if (!SGS_API_ENABLED) return false;
+  try {
+    const resp = await fetch(`${SGS_API_BASE}/api/version`, { signal: AbortSignal.timeout(3000) });
+    if (!resp.ok) return false;
+    const info = await resp.json();
+    console.log(`[SGS] API v${info.version} 已连接 — ${info.heroes_count} 武将, ${info.cards_count} 卡牌`);
+
+    // 并行加载所有数据
+    const [heroesRes, tagsRes, cardsRes, rulesRes, teamsRes] = await Promise.all([
+      fetch(`${SGS_API_BASE}/api/heroes`).then(r => r.json()),
+      fetch(`${SGS_API_BASE}/api/tags`).then(r => r.json()),
+      fetch(`${SGS_API_BASE}/api/cards`).then(r => r.json()),
+      fetch(`${SGS_API_BASE}/api/rules`).then(r => r.json()),
+      fetch(`${SGS_API_BASE}/api/teams`).then(r => r.json()),
+    ]);
+
+    // 替换全局数据
+    window.HEROES = heroesRes.heroes;
+    window.ALL_TAGS = tagsRes.tags;
+    window.CARDS = {
+      basic_cards: cardsRes.cards.filter(c => c.category === 'basic'),
+      trick_cards: cardsRes.cards.filter(c => c.category === 'trick'),
+      equipment_cards: cardsRes.cards.filter(c => c.category === 'equipment'),
     };
-  });
-  const allCards = [
-    ...CARDS.basic_cards.map(c => ({ ...c, _cat: 'basic' })),
-    ...CARDS.trick_cards.map(c => ({ ...c, _cat: 'trick' })),
-    ...CARDS.equipment_cards.map(c => ({ ...c, _cat: 'equipment' }))
-  ];
-  allCards.forEach(c => {
-    FACTS_MAP[c.name] = {
-      type: 'card',
-      data: c,
-      name: c.name
-    };
-  });
-})();
+    window.RULES = rulesRes;
+    window.TEAM_COMPOSITIONS = teamsRes.compositions;
+
+    // 加载每个武将的搭配数据
+    const synergyPromises = heroesRes.heroes.map(h =>
+      fetch(`${SGS_API_BASE}/api/synergy/${encodeURIComponent(h.name)}`).then(r => r.json()).catch(() => null)
+    );
+    const synergyResults = await Promise.all(synergyPromises);
+    window.SYNERGIES = {};
+    synergyResults.forEach(s => {
+      if (s && s.synergy) window.SYNERGIES[s.name] = s.synergy;
+    });
+
+    // 重建 FACTS_MAP
+    buildFacts();
+    SGS_API_AVAILABLE = true;
+    console.log('[SGS] API 数据加载完成');
+    return true;
+  } catch (e) {
+    console.warn('[SGS] API 不可用，使用本地数据:', e.message);
+    SGS_API_AVAILABLE = false;
+    return false;
+  }
+}
 
 // ===== INIT =====
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  // 先尝试从 API 加载
+  await loadFromAPI();
+
   renderHeroes();
   renderCards();
   renderRules();
   renderAskExamples();
   setupInstallBanner();
-  // Auto-init camera when switching to camera tab
   setupCameraTab();
+
+  // 显示数据来源
+  const sourceBadge = SGS_API_AVAILABLE ? '🌐 API' : '📱 本地';
+  console.log(`[SGS] 数据来源: ${sourceBadge}`);
 });
 
 // ===== TABS =====

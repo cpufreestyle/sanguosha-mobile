@@ -756,8 +756,13 @@
   <button class="close-banner" id="closeBanner">✕</button>
 </div>
 
-<script src="data.js"></script>
 <script src="config.js"></script>
+<script>
+  // API 配置 — 优先从 REST API 加载，失败时 fallback 到本地 data.js
+  window.SGS_API = (window.CONFIG && window.CONFIG.API_URL) || 'http://localhost:8100';
+  window.SGS_USE_API = (window.CONFIG && window.CONFIG.USE_API !== undefined) ? window.CONFIG.USE_API : true;
+</script>
+<script src="data.js"></script>
 <script src="app.js"></script>
 <script>
   // Register service worker

@@ -1,4 +1,10 @@
 // AI 视觉识别配置
+const CONFIG = {
+  // REST API 配置
+  API_URL: 'http://localhost:8100',
+  USE_API: true,
+};
+
 const VISION_CONFIG = {
   // 支持的视觉模型，按优先级排列
   providers: [
