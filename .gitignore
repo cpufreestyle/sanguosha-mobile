@@ -1,5 +1,10 @@
-# 敏感配置
+# 鏁忔劅閰嶇疆
 config.js
+
+# Keystore (瀹夊叏锛氫笉鍦ㄤ粨搴撲腑瀛樺偍绛惧悕瀵嗛挜)
+*.keystore
+*.jks
+keystore.properties
 
 # Build outputs
 android_build/
@@ -9,6 +14,7 @@ dist/
 *.jar
 *.dex
 *.class
+*.zip
 
 # Python
 __pycache__/
