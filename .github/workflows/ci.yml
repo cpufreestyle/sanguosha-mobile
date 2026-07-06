@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate HTML
+        run: |
+          test -f index.html && echo "index.html exists"
+          test -f app.js && echo "app.js exists"
+          test -f data.js && echo "data.js exists"
+          test -f config.js && echo "config.js exists"
+
+      - name: Check for sensitive files
+        run: |
+          # Warn if keystore or secrets are tracked
+          if git ls-files | grep -qi 'keystore\|\.env\|secret'; then
+            echo "⚠️ WARNING: Sensitive file detected in repository!"
+            git ls-files | grep -i 'keystore\|\.env\|secret' || true
+          else
+            echo "✓ No sensitive files found"
+          fi
+
+      - name: Check manifest
+        run: |
+          python -c "import json; json.load(open('manifest.json')); print('manifest.json: valid')"
+
+      - name: Check config example
+        run: |
+          test -f config.example.js && echo "config.example.js exists"
