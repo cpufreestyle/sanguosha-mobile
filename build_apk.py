@@ -2,6 +2,7 @@
 """
 三国杀助手 APK 构建脚本
 一键构建包含摄像头视觉识别功能的 Android APK
+支持 Windows / macOS / Linux
 """
 import os
 import sys
@@ -11,17 +12,23 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-# Set JAVA_HOME for d8.bat (must be set before subprocess calls)
-if not os.environ.get('JAVA_HOME'):
-    _jdk = Path(r'D:\jdk17')
-    if _jdk.exists():
-        os.environ['JAVA_HOME'] = str(_jdk)
-    else:
-        _jdk2 = Path(r'D:\qclaw-workspace\jdk-17.0.10+7')
-        if _jdk2.exists():
-            os.environ['JAVA_HOME'] = str(_jdk2)
+IS_WINDOWS = sys.platform == 'win32'
+IS_MACOS = sys.platform == 'darwin'
+EXE = '.exe' if IS_WINDOWS else ''
 
-# Fix Windows console encoding
+# Set JAVA_HOME (must be set before subprocess calls)
+if not os.environ.get('JAVA_HOME'):
+    for candidate in [
+        r'D:\jdk17',
+        r'D:\qclaw-workspace\jdk-17.0.10+7',
+        '/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home',
+        '/usr/lib/jvm/java-17-openjdk',
+    ]:
+        if Path(candidate).exists():
+            os.environ['JAVA_HOME'] = candidate
+            break
+
+# Fix console encoding (Windows)
 if sys.stdout and hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 if sys.stderr and hasattr(sys.stderr, 'reconfigure'):
@@ -36,21 +43,20 @@ BUILD_DIR = APP_DIR / "android_build"
 ASSETS_DIR = ANDROID_DIR / "assets"
 
 # Android SDK 路径
-ANDROID_HOME = Path(os.environ.get("ANDROID_HOME", r"D:\qclaw-workspace\android-sdk"))
+_default_android_home = r"D:\qclaw-workspace\android-sdk" if IS_WINDOWS else os.path.expanduser("~/Android/Sdk")
+ANDROID_HOME = Path(os.environ.get("ANDROID_HOME", _default_android_home))
 BUILD_TOOLS = ANDROID_HOME / "build-tools" / "33.0.1"
 JDK_HOME = Path(os.environ.get("JAVA_HOME", r"D:\qclaw-workspace\jdk-17.0.10+7"))
 PLATFORM = ANDROID_HOME / "platforms" / "android-33"
 
 # 工具路径
-AAPT2 = BUILD_TOOLS / "aapt2.exe"
-AAPT = ANDROID_HOME / "build-tools" / "33.0.1" / "aapt.exe"
-AAPT2_COMPILE = BUILD_TOOLS / "aapt2"
+AAPT2 = BUILD_TOOLS / f"aapt2{EXE}"
 D8_JAR = BUILD_TOOLS / "lib" / "d8.jar"
 APKSIGNER_JAR = BUILD_TOOLS / "lib" / "apksigner.jar"
-JAVA = JDK_HOME / "bin" / "java.exe"
-ZIPALIGN = BUILD_TOOLS / "zipalign.exe"
-JAVAC = JDK_HOME / "bin" / "javac.exe"
-JAR = JDK_HOME / "bin" / "jar.exe"
+JAVA = JDK_HOME / "bin" / f"java{EXE}"
+ZIPALIGN = BUILD_TOOLS / f"zipalign{EXE}"
+JAVAC = JDK_HOME / "bin" / f"javac{EXE}"
+JAR = JDK_HOME / "bin" / f"jar{EXE}"
 
 ANDROID_JAR = PLATFORM / "android.jar"
 ANDROID_MANIFEST = ANDROID_DIR / "AndroidManifest.xml"
@@ -273,7 +279,7 @@ def build_apk():
     # Check if keystore exists, if not create it
     if not KEYSTORE.exists():
         print("  创建签名密钥...")
-        keytool = JDK_HOME / "bin" / "keytool.exe"
+        keytool = JDK_HOME / "bin" / f"keytool{EXE}"
         if keytool.exists():
             keygen_cmd = [
                 str(keytool), "-genkey",
@@ -306,7 +312,7 @@ def build_apk():
             log(f"APK 签名完成: {OUTPUT_APK}")
         except SystemExit:
             # Fallback: use jarsigner
-            jarsigner = JDK_HOME / "bin" / "jarsigner.exe"
+            jarsigner = JDK_HOME / "bin" / f"jarsigner{EXE}"
             if jarsigner.exists():
                 sign_cmd = [
                     str(jarsigner),

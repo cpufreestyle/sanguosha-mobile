@@ -12,12 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate HTML
+      - name: Validate core files
         run: |
           test -f index.html && echo "index.html exists"
           test -f app.js && echo "app.js exists"
           test -f data.js && echo "data.js exists"
-          test -f config.js && echo "config.js exists"
+          test -f config.example.js && echo "config.example.js exists"
 
       - name: Check for sensitive files
         run: |
@@ -36,3 +36,5 @@ jobs:
       - name: Check config example
         run: |
           test -f config.example.js && echo "config.example.js exists"
+          # Ensure config.js is NOT tracked
+          ! git ls-files | grep -q '^config.js$' && echo "config.js correctly gitignored"

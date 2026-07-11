@@ -1,5 +1,21 @@
 // 三国杀助手 - 移动端应用逻辑
 
+// ===== 默认配置（可被 config.js 覆盖） =====
+const CONFIG = window.CONFIG || { API_URL: 'http://localhost:8100', USE_API: true };
+const VISION_CONFIG = window.VISION_CONFIG || {
+  providers: [
+    { name: 'ollama', label: '本地 Ollama', endpoint: 'http://localhost:11434/api/generate', model: 'llama3.2-vision:11b', type: 'ollama' },
+    { name: 'openai', label: 'OpenAI GPT-4o', endpoint: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini', type: 'openai', apiKey: '' },
+    { name: 'openrouter', label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', model: 'deepseek-ai/deepseek-vl2:latest', type: 'openai', apiKey: '' },
+  ],
+  activeProvider: 'ollama',
+  timeout: 30000,
+};
+function getActiveProvider() {
+  return VISION_CONFIG.providers.find(p => p.name === VISION_CONFIG.activeProvider) || VISION_CONFIG.providers[0];
+}
+const VISION_SYSTEM_PROMPT = window.VISION_SYSTEM_PROMPT || `你是一个三国杀游戏助手，专门识别游戏画面中的武将和卡牌。\n请仔细分析图片，返回JSON格式的识别结果：{"type":"hero"|"card"|"unknown","name":"名称","confidence":0.0-1.0,"description":"简要描述"}`;
+
 let currentTab = 'heroes';
 let heroFilter = { faction: 'all', search: '', tag: 'all' };
 let cardFilter = { type: 'all', search: '' };
@@ -7,35 +23,25 @@ let deferredPrompt = null;
 
 // ===== CAMERA STATE =====
 let cameraStream = null;
-let currentFacing = 'environment'; // 'environment' = 后置, 'user' = 前置
+let currentFacing = 'environment';
 let cameraActive = false;
 
 // ===== API STATE =====
-let SGS_API_BASE = window.SGS_API || 'http://localhost:8100';
-let SGS_API_ENABLED = window.SGS_USE_API !== false;
-let SGS_API_AVAILABLE = false; // 运行时检测
+let SGS_API_BASE = CONFIG.API_URL || 'http://localhost:8100';
+let SGS_API_ENABLED = CONFIG.USE_API !== false;
+let SGS_API_AVAILABLE = false;
 
-// ===== FACTS CHECK (for local fallback) =====
+// ===== FACTS MAP (for local fallback) =====
 const FACTS_MAP = {};
 
-// Build facts map from HEROES and CARDS (from data.js fallback)
+// Build facts map from HEROES and CARDS
 function buildFacts() {
-  FACTS_MAP.length = 0;
   Object.keys(FACTS_MAP).forEach(k => delete FACTS_MAP[k]);
   if (typeof HEROES !== 'undefined') {
-    HEROES.forEach(h => {
-      FACTS_MAP[h.name] = { type: 'hero', data: h, name: h.name };
-    });
+    HEROES.forEach(h => { FACTS_MAP[h.name] = { type: 'hero', data: h, name: h.name }; });
   }
   if (typeof CARDS !== 'undefined') {
-    const allCards = [
-      ...CARDS.basic_cards.map(c => ({ ...c, _cat: 'basic' })),
-      ...CARDS.trick_cards.map(c => ({ ...c, _cat: 'trick' })),
-      ...CARDS.equipment_cards.map(c => ({ ...c, _cat: 'equipment' }))
-    ];
-    allCards.forEach(c => {
-      FACTS_MAP[c.name] = { type: 'card', data: c, name: c.name };
-    });
+    getAllCards().forEach(c => { FACTS_MAP[c.name] = { type: 'card', data: c, name: c.name }; });
   }
 }
 
@@ -104,6 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderAskExamples();
   setupInstallBanner();
   setupCameraTab();
+  _bindHeroPickerSearch();
 
   // 显示数据来源
   const sourceBadge = SGS_API_AVAILABLE ? '🌐 API' : '📱 本地';
@@ -144,7 +151,7 @@ function renderHeroes(heroes = HEROES) {
       if (!h.name.toLowerCase().includes(s) && !h.title.toLowerCase().includes(s)) return false;
     }
     if (heroFilter.tag !== 'all') {
-      const tags = h.tags || HERO_TAGS[h.name] || []; // Support both new .tags and legacy HERO_TAGS
+      const tags = h.tags || [];
       if (!tags.includes(heroFilter.tag)) return false;
     }
     return true;
@@ -156,8 +163,8 @@ function renderHeroes(heroes = HEROES) {
   }
 
   list.innerHTML = filtered.map(h => {
-    const tags = h.tags || HERO_TAGS[h.name] || []; // Support both
-    const tagsHtml = tags.length > 0 ? `<div class="hero-tags">${tags.slice(0, 5).map(t => `<span class="hero-tag">${t}</span>`).join('')}</div>` : ''; // Show up to 5 tags
+    const tags = h.tags || [];
+    const tagsHtml = tags.length > 0 ? `<div class="hero-tags">${tags.slice(0, 5).map(t => `<span class="hero-tag">${t}</span>`).join('')}</div>` : '';
     return `<div class="hero-card" onclick="toggleHero(this)" data-hero="${h.name}" data-tags="${tags.join(',')}">
       <div class="hero-card-header">
         <div class="hero-avatar faction-${h.faction}">${h.name[0]}</div>
@@ -467,12 +474,16 @@ function getAnswer(q) {
 let selectedHero = null;
 
 function showHeroPicker() {
-  const modal = document.getElementById('heroPickerModal');
-  const list = document.getElementById('modalHeroList');
-
   renderModalHeroes(HEROES);
-  modal.classList.add('show');
+  document.getElementById('heroPickerModal').classList.add('show');
+  document.getElementById('modalHeroSearch').value = '';
+}
 
+// Tag pill listener (bound once)
+let _heroPickerBound = false;
+function _bindHeroPickerSearch() {
+  if (_heroPickerBound) return;
+  _heroPickerBound = true;
   document.getElementById('modalHeroSearch').addEventListener('input', e => {
     const s = e.target.value.toLowerCase();
     const filtered = HEROES.filter(h =>
@@ -527,7 +538,7 @@ function renderTeamResult() {
   const synergy = SYNERGIES[selectedHero.name];
 
   // Hero tags
-  const tags = HERO_TAGS[selectedHero.name] || [];
+  const tags = selectedHero.tags || [];
 
   container.innerHTML = `
     <div class="team-selected-hero" onclick="showHeroPicker()">
@@ -965,21 +976,14 @@ function displayRecognizeResult(result, imageDataUrl) {
 
   // Card
   if (result.type === 'card') {
-    const allCards = [
-      ...CARDS.basic_cards.map(c => ({ ...c, _cat: 'basic' })),
-      ...CARDS.trick_cards.map(c => ({ ...c, _cat: 'trick' })),
-      ...CARDS.equipment_cards.map(c => ({ ...c, _cat: 'equipment' }))
-    ];
-    const card = allCards.find(c => c.name === result.name);
+    const card = getAllCards().find(c => c.name === result.name);
 
     if (!card) {
       resultEl.innerHTML = `<div class="recog-error">识别到「${result.name}」但数据库未收录</div>`;
       return;
     }
 
-    const cardClass = card.name.includes('马') ? 'horse-card' :
-      card._cat === 'basic' ? 'basic-card' :
-      card._cat === 'trick' ? 'trick-card' : 'equip-card';
+    const cardClass = cardCssClass(card._cat, card.name);
 
     resultEl.innerHTML = `
       <div class="recog-card">

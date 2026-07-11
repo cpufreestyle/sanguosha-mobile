@@ -22,7 +22,6 @@ with open(DATA_FILE, "r", encoding="utf-8") as f:
 
 HEROES = DATA["HEROES"]
 ALL_TAGS = DATA["ALL_TAGS"]
-HERO_TAGS = DATA["HERO_TAGS"]
 SYNERGIES = DATA["SYNERGIES"]
 GENERAL_TIP = DATA["GENERAL_TIP"]
 TEAM_COMPOSITIONS = DATA["TEAM_COMPOSITIONS"]
@@ -108,7 +107,7 @@ async def get_hero(name: str):
 
     # 附加额外信息
     hero_with_extras = dict(hero)
-    hero_with_extras["tags_detail"] = HERO_TAGS.get(name, [])
+    hero_with_extras["tags_detail"] = hero.get("tags", [])
 
     synergy = SYNERGIES.get(name)
     if synergy:

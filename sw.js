@@ -1,4 +1,4 @@
-const CACHE = 'sanguosha-v1';
+const CACHE = 'sanguosha-v1.4';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
+// config.js is optional (may not exist on fresh clone)
 
 self.addEventListener('install', e => {
   e.waitUntil(

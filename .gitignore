@@ -1,13 +1,14 @@
-# 鏁忔劅閰嶇疆
+# 敏感配置
 config.js
 
-# Keystore (瀹夊叏锛氫笉鍦ㄤ粨搴撲腑瀛樺偍绛惧悕瀵嗛挜)
+# Keystore (安全：不在仓库中存储签名密钥)
 *.keystore
 *.jks
 keystore.properties
 
 # Build outputs
 android_build/
+android/assets/
 build/
 dist/
 *.apk

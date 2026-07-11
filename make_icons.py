@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+"""生成三国杀助手应用图标"""
+from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-import os
 
-out_dir = r"C:\Users\michael\.qclaw\workspace\sanguosha-mobile\icons"
-os.makedirs(out_dir, exist_ok=True)
+out_dir = Path(__file__).parent / "icons"
+out_dir.mkdir(exist_ok=True)
+
 
 def make_icon(size):
     bg = (26, 10, 0, 255)
@@ -25,20 +28,20 @@ def make_icon(size):
         draw.ellipse([cx + dx * half - dot_r, cy + dy * half - dot_r,
                       cx + dx * half + dot_r, cy + dy * half + dot_r], fill=gold)
     try:
-        fontsize = size // 3
-        font = ImageFont.truetype("C:\\Windows\\Fonts\\msyh.ttc", fontsize)
-    except:
-        font = ImageFont.load_default()
+        font = ImageFont.truetype("msyh.ttc", size // 3)
+    except Exception:
+        try:
+            font = ImageFont.truetype("/System/Library/Fonts/PingFang.ttc", size // 3)
+        except Exception:
+            font = ImageFont.load_default()
     text = "\u6740"
     bbox = draw.textbbox((0, 0), text, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    tx = cx - tw // 2
-    ty = cy - th // 2 - size // 20
-    draw.text((tx, ty), text, font=font, fill=gold)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    draw.text((cx - tw // 2, cy - th // 2 - size // 20), text, font=font, fill=gold)
     return img
 
+
 for sz in [192, 512]:
-    make_icon(sz).save(os.path.join(out_dir, f"icon-{sz}.png"))
+    make_icon(sz).save(out_dir / f"icon-{sz}.png")
     print(f"Saved icon-{sz}.png")
 print("Done!")

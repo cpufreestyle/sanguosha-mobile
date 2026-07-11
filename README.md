@@ -12,10 +12,12 @@
 
 | 模块 | 说明 |
 |------|------|
-| 🔍 **武将查询** | 蜀/魏/吴/群四大势力，10位经典武将，含技能详解、体力值 |
+| 🔍 **武将查询** | 蜀/魏/吴/群四大势力，25位经典武将，含技能详解、体力值、标签筛选 |
 | 🃏 **卡牌查询** | 22张标准版卡牌，含杀、闪、桃、锦囊、装备等 |
 | 📖 **游戏规则** | 出牌规则、距离计算、伤害流程、判定阶段等核心规则 |
-| ❓ **智能问答** | AI 回答游戏相关问题，支持自然语言提问 |
+| 📷 **拍照识别** | AI 视觉识别武将/卡牌，支持 Ollama/OpenAI/OpenRouter |
+| ⚔️ **配将推荐** | 选择武将查看推荐配合、推荐卡牌及出牌建议 |
+| ❓ **智能问答** | 本地关键词匹配回答游戏相关问题 |
 
 ### 🌟 特色亮点
 
@@ -137,20 +139,30 @@ sdkmanager --install "build-tools;34.0.0"
 ```
 sanguosha-mobile/
 ├── index.html              # PWA 主页面（移动端 UI）
-├── app.js                  # 应用核心逻辑（武将/卡牌/规则/问答）
-├── data.js                 # 游戏数据（武将+卡牌+规则 JSON）
-├── manifest.json           # PWA 清单（应用信息、图标）
-├── sw.js                   # Service Worker（离线缓存策略）
+├── app.js                  # 应用核心逻辑（含默认配置）
+├── data.js                 # 游戏数据（武将+卡牌+规则）
+├── config.example.js       # AI 视觉识别配置示例
+├── config.js               # 用户配置（gitignored，可选）
+├── manifest.json           # PWA 清单
+├── sw.js                   # Service Worker（离线缓存）
 ├── make_icons.py           # 应用图标生成脚本（PIL）
-├── build_apk.py            # APK 构建脚本（可选）
+├── build_apk.py            # APK 构建脚本
 ├── README.md               # 项目文档
+│
+├── android/                # Android 原生壳
+│   ├── AndroidManifest.xml
+│   ├── src/                # MainActivity.java
+│   └── res/                # 图标等资源
+│
+├── api/                    # REST API 后端（FastAPI）
+│   ├── main.py
+│   └── data.json
 │
 ├── icons/                  # 应用图标
 │   ├── icon-192.png
 │   └── icon-512.png
 │
-└── dist/                   # 构建输出
-    └── 三国杀助手.apk       # Android 安装包（83KB）
+└── dist/                   # 构建输出（gitignored）
 ```
 
 ---
@@ -277,7 +289,20 @@ A: 在 Gitee 仓库提交 Issue 即可。
 
 ## 🔄 更新日志
 
-### v1.0.0 (2026-04-10)
+### v1.4.0 (2026-07-11)
+- 🐛 修复「出牌建议」tab 引用未定义函数导致页面崩溃
+- 🐛 修复 `buildFacts()` 中 `FACTS_MAP.length = 0` 对对象无效的死代码
+- 🐛 修复 `showHeroPicker()` 每次打开重复绑定事件监听器
+- 🐛 修复 `config.js` 被 gitignore 后克隆仓库时应用崩溃（默认配置内置于 app.js）
+- 🐛 修复 CI 检查 `config.js` 导致流水线失败
+- 🔧 `.gitignore` 中文注释乱码修复
+- 🔧 `make_icons.py` 硬编码 Windows 路径改为跨平台相对路径
+- 🧹 移除冗余的 `HERO_TAGS` 对象（标签已合并到武将 `.tags` 字段）
+- 🧹 移除 `android/assets/` 陈旧副本（构建时自动生成）
+- 🧹 DRY: `getAllCards()` / `cardCssClass()` 统一复用
+- 📦 Service Worker 缓存版本更新至 v1.4
+
+### v1.3.0 (2026-04-10)
 - ✨ 首次发布
 - 🃏 10位经典武将数据
 - 📖 游戏规则速查
