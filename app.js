@@ -87,7 +87,8 @@ async function loadFromAPI() {
       if (s && s.synergy) window.SYNERGIES[s.name] = s.synergy;
     });
 
-    // 重建 FACTS_MAP
+    // 重建 FACTS_MAP 和卡片缓存
+    _allCardsCache = null;
     buildFacts();
     SGS_API_AVAILABLE = true;
     console.log('[SGS] API 数据加载完成');
@@ -98,6 +99,9 @@ async function loadFromAPI() {
     return false;
   }
 }
+
+// ===== CACHED CARD LIST =====
+let _allCardsCache = null;
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
@@ -134,6 +138,10 @@ document.querySelectorAll('.tab').forEach(tab => {
       startCamera();
     } else {
       stopCamera();
+    }
+    // 离开出牌页时关闭手牌拍照弹窗，释放摄像头
+    if (currentTab !== 'advice') {
+      closeAdviceCamera();
     }
     if (currentTab === 'team') {
       renderTeamResult();
@@ -217,11 +225,14 @@ document.getElementById('tagPills').addEventListener('click', e => {
 
 // ===== CARDS =====
 function getAllCards() {
-  return [
-    ...CARDS.basic_cards.map(c => ({ ...c, _cat: 'basic' })),
-    ...CARDS.trick_cards.map(c => ({ ...c, _cat: 'trick' })),
-    ...CARDS.equipment_cards.map(c => ({ ...c, _cat: 'equipment' }))
-  ];
+  if (!_allCardsCache) {
+    _allCardsCache = [
+      ...CARDS.basic_cards.map(c => ({ ...c, _cat: 'basic' })),
+      ...CARDS.trick_cards.map(c => ({ ...c, _cat: 'trick' })),
+      ...CARDS.equipment_cards.map(c => ({ ...c, _cat: 'equipment' }))
+    ];
+  }
+  return _allCardsCache;
 }
 
 function cardTypeIcon(cat) {
@@ -380,6 +391,14 @@ function renderAskExamples() {
       <span>${e.q}</span>
     </div>
   `).join('');
+
+  // 自由输入框回车提交
+  document.getElementById('askInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.value.trim()) {
+      askQuestion(e.target.value.trim());
+      e.target.value = '';
+    }
+  });
 }
 
 function askQuestion(question) {
@@ -472,25 +491,24 @@ function getAnswer(q) {
 
 // ===== TEAM RECOMMENDATION =====
 let selectedHero = null;
+let heroPickerMode = 'team'; // 'team' = 配将页选主将, 'advice' = 出牌页选武将
 
 function showHeroPicker() {
-  renderModalHeroes(HEROES);
-  document.getElementById('heroPickerModal').classList.add('show');
-  document.getElementById('modalHeroSearch').value = '';
+function showHeroPicker() {
+  heroPickerMode = 'team';
+  openHeroPicker('选择主将');
 }
 
-// Tag pill listener (bound once)
-let _heroPickerBound = false;
-function _bindHeroPickerSearch() {
-  if (_heroPickerBound) return;
-  _heroPickerBound = true;
-  document.getElementById('modalHeroSearch').addEventListener('input', e => {
-    const s = e.target.value.toLowerCase();
-    const filtered = HEROES.filter(h =>
-      h.name.toLowerCase().includes(s) || h.title.toLowerCase().includes(s)
-    );
-    renderModalHeroes(filtered);
-  });
+function showAdviceHeroPicker() {
+  heroPickerMode = 'advice';
+  openHeroPicker('选择你的武将');
+}
+
+function openHeroPicker(title) {
+  document.querySelector('#heroPickerModal .modal-title').textContent = title;
+  renderModalHeroes(HEROES);
+  document.getElementById('heroPickerModal').classList.add('show');
+}
 }
 
 function renderModalHeroes(heroes) {
@@ -515,10 +533,27 @@ function closeHeroPicker() {
   document.getElementById('modalHeroSearch').value = '';
 }
 
+// 模态框搜索（只注册一次，避免重复绑定）
+document.getElementById('modalHeroSearch').addEventListener('input', e => {
+  const s = e.target.value.toLowerCase();
+  const filtered = HEROES.filter(h =>
+    h.name.toLowerCase().includes(s) || h.title.toLowerCase().includes(s)
+  );
+  renderModalHeroes(filtered);
+});
+
 function selectHero(name) {
   closeHeroPicker();
-  selectedHero = HEROES.find(h => h.name === name);
-  renderTeamResult();
+  if (heroPickerMode === 'advice') {
+    adviceHero = HEROES.find(h => h.name === name);
+    document.getElementById('adviceHeroSearch').value = `${adviceHero.name}（${adviceHero.title}）`;
+    document.getElementById('adviceHandSection').style.display = '';
+    document.getElementById('adviceSituationSection').style.display = '';
+    renderAdviceHandCards();
+  } else {
+    selectedHero = HEROES.find(h => h.name === name);
+    renderTeamResult();
+  }
 }
 
 function renderTeamResult() {
@@ -625,6 +660,423 @@ function renderTeamResult() {
 
 function toggleTeamCard(card) {
   card.classList.toggle('open');
+}
+
+// ===== ADVICE (出牌建议) =====
+let adviceHero = null;
+let adviceHand = []; // 手牌名数组，允许重复（如三张【杀】）
+let adviceSituation = 'default';
+let adviceCameraStream = null;
+let adviceFacing = 'environment'; // 'environment' = 后置, 'user' = 前置
+
+const ADVICE_SITUATIONS = {
+  default: { label: '通用', note: '根据手牌结构灵活出牌，优先处理无代价的收益牌。' },
+  early: { label: '开局', note: '优先【无中生有】补牌、用【顺手牵羊】/【过河拆桥】干扰敌人；防具与马匹尽早上身；【杀】留给够得着的高价值目标。' },
+  mid: { label: '中盘', note: '用【乐不思蜀】压制敌方核心；装备成型后集中输出；注意保留1~2张【闪】防被集火。' },
+  late: { label: '残局', note: '残血时优先留【桃】保命；输出牌果断使用争取斩杀；距离不够时靠【-1马】、【决斗】补伤害。' }
+};
+
+// 卡牌通用建议 action: use=优先使用 / situational=视情况 / hold=建议保留
+const CARD_ADVICE_RULES = {
+  '无中生有': { action: 'use', reason: '立即使用补充2张手牌，无任何代价' },
+  '五谷丰登': { action: 'use', reason: '团队补牌收益高，但注意也会给敌人送牌' },
+  '桃': { action: 'situational', reason: '体力不满时回复；体力满时不能用，先保留' },
+  '杀': { action: 'use', reason: '对攻击范围内敌人使用，注意每回合默认限用一张' },
+  '闪': { action: 'hold', reason: '响应敌人【杀】的保命牌，建议保留' },
+  '决斗': { action: 'situational', reason: '自己【杀】充足或对手缺【杀】时使用' },
+  '过河拆桥': { action: 'use', reason: '优先拆除敌人关键装备（连弩、防具）或己方判定区的乐不思蜀' },
+  '顺手牵羊': { action: 'use', reason: '距离1内优先牵敌人关键牌，拿到装备可直接穿戴' },
+  '南蛮入侵': { action: 'situational', reason: '群体伤害，但也会消耗队友的【杀】' },
+  '万箭齐发': { action: 'situational', reason: '群体伤害，但也会消耗队友的【闪】' },
+  '乐不思蜀': { action: 'use', reason: '延时控制，优先压给敌方核心输出位' },
+  '闪电': { action: 'situational', reason: '高风险延时锦囊，劣势可赌，优势慎用' },
+  '桃园结义': { action: 'situational', reason: '己方整体掉血时使用收益最大' },
+  '诸葛连弩': { action: 'use', reason: '装备后【杀】无次数限制，配合多张【杀】爆发' },
+  '青釭剑': { action: 'use', reason: '装备克制八卦阵、仁王盾等防具' },
+  '丈八蛇矛': { action: 'use', reason: '两张手牌当一张【杀】，缺【杀】时应急' },
+  '贯石斧': { action: 'use', reason: '【杀】被【闪】抵消后弃两张牌强制命中，斩杀利器' },
+  '青龙偃月刀': { action: 'use', reason: '【杀】被【闪】抵消后可追击一张【杀】' },
+  '八卦阵': { action: 'use', reason: '装备后概率出【闪】，提升生存' },
+  '仁王盾': { action: 'use', reason: '装备后黑色【杀】对你无效' },
+  '+1马': { action: 'use', reason: '装备增加别人与你的距离，防御型' },
+  '-1马': { action: 'use', reason: '装备减少你与别人的距离，更容易够到目标' }
+};
+
+// 建议出牌顺序（数字越小越先出）
+const ADVICE_PLAY_ORDER = {
+  '无中生有': 1,
+  '五谷丰登': 2,
+  '过河拆桥': 3,
+  '顺手牵羊': 3,
+  '乐不思蜀': 4,
+  '桃园结义': 5,
+  '诸葛连弩': 6, '青釭剑': 6, '丈八蛇矛': 6, '贯石斧': 6, '青龙偃月刀': 6,
+  '八卦阵': 6, '仁王盾': 6, '+1马': 6, '-1马': 6,
+  '杀': 7,
+  '决斗': 8, '南蛮入侵': 8, '万箭齐发': 8,
+  '闪电': 9,
+  '桃': 10
+};
+
+// 武将对手牌的特殊加成说明
+const HERO_CARD_NOTES = {
+  '关羽': { '杀': '武圣：红色牌可当【杀】使用，红色手牌都是潜在输出' },
+  '张飞': { '杀': '咆哮：出牌阶段【杀】无次数限制，有杀尽量全出' },
+  '赵云': { '杀': '龙胆：【杀】【闪】可互相转化，攻防一体', '闪': '龙胆：【闪】也可当【杀】打出，保留价值更高' },
+  '诸葛亮': { '闪': '空城：没有手牌时不能成为【杀】【决斗】目标，残局可考虑清空手牌' },
+  '吕布': { '决斗': '无双：决斗目标需连出两张【杀】，你占优时果断使用', '杀': '无双：你的【杀】需两张【闪】才能抵消，命中率高' },
+  '黄忠': { '杀': '烈弓：目标手牌数≥你的体力值时，【杀】不可被【闪】响应' },
+  '马超': { '杀': '铁骑：判定为红色时，【杀】不可被【闪】响应' },
+  '许褚': { '杀': '裸衣状态下【杀】伤害+1，优先留到裸衣回合' },
+  '甘宁': { '过河拆桥': '奇袭：黑色牌可当【过河拆桥】使用' },
+  '吕蒙': { '杀': '克己：本回合不用【杀】可跳过弃牌阶段，蓄爆时可忍一手' },
+  '黄盖': { '桃': '苦肉会掉血，【桃】能支撑更多次爆发' },
+  '大乔': { '乐不思蜀': '国色：方块牌可当【乐不思蜀】使用' },
+  '华佗': { '桃': '急救：回合外红色牌可当【桃】救人，红牌价值更高' },
+  '甄姬': { '闪': '倾国：黑色手牌可当【闪】，黑色牌保留价值更高' },
+  '袁绍': { '万箭齐发': '乱击：两张同花色手牌可当【万箭齐发】使用' },
+  '貂蝉': { '决斗': '离间可弃牌令两名男性角色决斗，【决斗】思路更灵活' }
+};
+
+// 局势修正：在通用规则基础上调整 action 与理由
+function adviceFor(name) {
+  const base = CARD_ADVICE_RULES[name] || { action: 'use', reason: '按牌面效果使用' };
+  let action = base.action;
+  let reason = base.reason;
+  if (adviceSituation === 'late') {
+    if (['杀', '决斗', '南蛮入侵', '万箭齐发', '贯石斧'].includes(name)) {
+      action = 'use';
+      reason += '；残局果断输出，争取斩杀';
+    }
+  }
+  if (adviceSituation === 'early' && (name === '南蛮入侵' || name === '万箭齐发')) {
+    action = 'situational';
+    reason += '；开局AOE收益有限且容易拉仇恨，可考虑后置';
+  }
+  if (adviceSituation === 'mid' && name === '乐不思蜀') {
+    reason += '；中盘优先压敌方核心输出位';
+  }
+  return { action, reason };
+}
+
+// 局势 pills
+document.getElementById('adviceSituationPills').addEventListener('click', e => {
+  const pill = e.target.closest('.pill');
+  if (!pill) return;
+  document.querySelectorAll('#adviceSituationPills .pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  adviceSituation = pill.dataset.situation;
+  renderAdvice();
+});
+
+// 手牌搜索过滤
+document.getElementById('adviceHandSearch').addEventListener('input', e => {
+  adviceHandSearch = e.target.value;
+  renderAdviceHandCards();
+});
+
+// ===== 手牌选择 =====
+let adviceHandSearch = '';
+
+function renderAdviceHandCards() {
+  const container = document.getElementById('adviceHandCards');
+  const s = adviceHandSearch.toLowerCase();
+  container.innerHTML = getAllCards()
+    .filter(c => !s || c.name.toLowerCase().includes(s) || c.type.toLowerCase().includes(s))
+    .map(c => {
+      const n = adviceHand.filter(x => x === c.name).length;
+      return `<div class="pill ${n > 0 ? 'active' : ''}" onclick="addAdviceHandCard('${c.name}')">${c.name}${n > 0 ? `<span class="pill-count">×${n}</span><span class="pill-minus" onclick="event.stopPropagation();removeAdviceHandCard('${c.name}')">−</span>` : ''}</div>`;
+    }).join('');
+  updateAdviceHandSummary();
+}
+
+function addAdviceHandCard(name) {
+  if (adviceHand.length >= 20) return;
+  adviceHand.push(name);
+  renderAdviceHandCards();
+}
+
+function removeAdviceHandCard(name) {
+  const idx = adviceHand.lastIndexOf(name);
+  if (idx >= 0) adviceHand.splice(idx, 1);
+  renderAdviceHandCards();
+}
+
+function clearAdviceHand() {
+  adviceHand = [];
+  renderAdviceHandCards();
+}
+
+function updateAdviceHandSummary() {
+  const el = document.getElementById('adviceSelectedHand');
+  if (adviceHand.length === 0) {
+    el.innerHTML = '点击卡牌添加手牌（可重复点击叠加张数）';
+  } else {
+    const counts = {};
+    adviceHand.forEach(n => counts[n] = (counts[n] || 0) + 1);
+    el.innerHTML = `共 ${adviceHand.length} 张：${Object.entries(counts).map(([n, c]) => `${n}×${c}`).join('、')} <span class="pill-minus" onclick="clearAdviceHand()">清空</span>`;
+  }
+  renderAdvice();
+}
+
+// ===== 建议渲染 =====
+function renderAdvice() {
+  const el = document.getElementById('adviceResult');
+  if (!adviceHero) {
+    el.innerHTML = `
+      <div class="team-empty" style="padding:30px 10px">
+        <div class="team-empty-icon">💡</div>
+        <div>先选择你的武将</div>
+        <div style="font-size:12px;margin-top:6px;color:var(--text2)">再勾选手牌与局势，即可获得出牌建议</div>
+      </div>`;
+    return;
+  }
+
+  const synergy = SYNERGIES[adviceHero.name];
+  const situation = ADVICE_SITUATIONS[adviceSituation];
+
+  let html = `
+    <div class="team-selected-hero" onclick="showAdviceHeroPicker()">
+      <div class="hero-avatar faction-${adviceHero.faction}" style="width:50px;height:50px;font-size:24px">${adviceHero.name[0]}</div>
+      <div>
+        <div class="team-selected-name">${adviceHero.name}</div>
+        <div class="team-selected-sub">${adviceHero.title} · ${adviceHero.faction} · ❤️${adviceHero.health}体力 · 🎯${situation.label}</div>
+      </div>
+      <div style="margin-left:auto;color:var(--text2);font-size:12px">▼</div>
+    </div>`;
+
+  if (adviceHand.length === 0) {
+    html += `
+      <div class="team-tip-box">
+        <div class="team-tip-label">💡 ${adviceHero.name}要点</div>
+        <div>${synergy ? synergy.tip : adviceHero.skills.map(s => `【${s.name}】${s.description}`).join('<br/>')}</div>
+      </div>
+      <div class="not-found" style="padding:20px">在上方勾选手牌后，这里会给出具体的出牌顺序建议</div>`;
+    el.innerHTML = html;
+    return;
+  }
+
+  const counts = {};
+  adviceHand.forEach(n => counts[n] = (counts[n] || 0) + 1);
+  const badges = { use: '优先使用', situational: '视情况', hold: '建议保留' };
+  const coreCards = synergy ? synergy.cards : [];
+
+  const items = Object.keys(counts).map(name => {
+    const { action, reason } = adviceFor(name);
+    return {
+      name,
+      count: counts[name],
+      action,
+      reason,
+      heroNote: (HERO_CARD_NOTES[adviceHero.name] || {})[name],
+      core: coreCards.includes(name),
+      order: ADVICE_PLAY_ORDER[name] || 99
+    };
+  });
+
+  const playSeq = items.filter(i => i.action === 'use').sort((a, b) => a.order - b.order);
+
+  html += `
+    <div class="team-section-title" style="margin-top:4px">📋 建议出牌顺序</div>
+    ${playSeq.length > 0 ? playSeq.map((i, idx) => `
+      <div class="advice-order-item">
+        <div class="advice-order-num">${idx + 1}</div>
+        <div>
+          <div><b>【${i.name}】</b>${i.count > 1 ? `×${i.count}` : ''}${i.core ? '<span class="advice-badge core">核心配合</span>' : ''}</div>
+          <div style="font-size:12px;color:var(--text2)">${i.reason}</div>
+          ${i.heroNote ? `<div style="font-size:12px;color:var(--gold)">✨ ${i.heroNote}</div>` : ''}
+        </div>
+      </div>`).join('') : '<div style="font-size:13px;color:var(--text2);padding:4px 0">当前手牌暂无适合立刻使用的牌，建议保留过牌</div>'}
+
+    <div class="team-section-title" style="margin-top:14px">🃏 全部手牌评估</div>
+    ${items.map(i => `
+      <div class="advice-card">
+        <div><b>【${i.name}】</b>${i.count > 1 ? ` ×${i.count}` : ''}
+          <span class="advice-badge ${i.action}">${badges[i.action]}</span>
+          ${i.core ? '<span class="advice-badge core">核心配合</span>' : ''}
+        </div>
+        <div style="margin-top:4px;color:var(--text2);font-size:12px">${i.reason}</div>
+        ${i.heroNote ? `<div style="margin-top:4px;font-size:12px;color:var(--gold)">✨ ${i.heroNote}</div>` : ''}
+      </div>`).join('')}
+
+    <div class="team-tip-box" style="margin-top:14px">
+      <div class="team-tip-label">🎯 ${situation.label}思路</div>
+      <div>${situation.note}</div>
+      ${synergy ? `<div style="margin-top:6px">${synergy.tip}</div>` : ''}
+    </div>`;
+
+  el.innerHTML = html;
+}
+
+// ===== 手牌拍照识别 =====
+async function openAdviceCamera() {
+  document.getElementById('adviceCameraModal').classList.add('show');
+  document.getElementById('adviceRecognizeResult').innerHTML = '';
+  await startAdviceCamera();
+}
+
+function closeAdviceCamera() {
+  stopAdviceCamera();
+  document.getElementById('adviceCameraModal').classList.remove('show');
+}
+
+async function startAdviceCamera() {
+  try {
+    adviceCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: adviceFacing },
+        width: { ideal: 1280 },
+        height: { ideal: 960 }
+      },
+      audio: false
+    });
+    document.getElementById('adviceCameraVideo').srcObject = adviceCameraStream;
+  } catch (err) {
+    document.getElementById('adviceRecognizeResult').innerHTML = `<div class="recog-error">摄像头启动失败：${err.message}</div>`;
+  }
+}
+
+function stopAdviceCamera() {
+  if (adviceCameraStream) {
+    adviceCameraStream.getTracks().forEach(t => t.stop());
+    adviceCameraStream = null;
+  }
+}
+
+async function switchAdviceCamera() {
+  adviceFacing = adviceFacing === 'environment' ? 'user' : 'environment';
+  stopAdviceCamera();
+  await startAdviceCamera();
+}
+
+async function captureAdviceCards() {
+  const video = document.getElementById('adviceCameraVideo');
+  const canvas = document.getElementById('adviceCameraCanvas');
+  const resultEl = document.getElementById('adviceRecognizeResult');
+  if (!video || !adviceCameraStream) return;
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+  resultEl.innerHTML = `
+    <div class="recog-loading">
+      <div style="font-size:32px;margin-bottom:8px">🔍</div>
+      <div>正在识别手牌...</div>
+      <div class="recog-loading-dot" style="margin-top:6px">●●●</div>
+    </div>`;
+
+  try {
+    const names = await recognizeHandCards(dataUrl);
+    if (names.length === 0) {
+      resultEl.innerHTML = `<div class="recog-error">未能识别到手牌，请对准手牌后重试</div>`;
+      return;
+    }
+    names.forEach(n => adviceHand.push(n));
+    renderAdviceHandCards();
+    const counts = {};
+    names.forEach(n => counts[n] = (counts[n] || 0) + 1);
+    resultEl.innerHTML = `<div style="font-size:13px;color:var(--shu)">✅ 已添加：${Object.entries(counts).map(([n, c]) => `${n}×${c}`).join('、')}</div>`;
+    setTimeout(() => closeAdviceCamera(), 900);
+  } catch (err) {
+    console.error('Hand recognition error:', err);
+    resultEl.innerHTML = `<div class="recog-error">❌ 识别失败: ${err.message}</div>`;
+  }
+}
+
+// 通用视觉识别调用：返回解析后的 JSON（ollama / openai 兼容两种 provider）
+async function visionJSON(systemPrompt, userText, imageDataUrl) {
+  const provider = getActiveProvider();
+  if (provider.type !== 'ollama' && !provider.apiKey) {
+    throw new Error(`「${provider.label}」未配置 API Key，请在 config.js 中填写`);
+  }
+  const base64 = imageDataUrl.split(',')[1];
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), VISION_CONFIG.timeout);
+
+  try {
+    let resp;
+    if (provider.type === 'ollama') {
+      resp = await fetch(provider.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: provider.model,
+          prompt: systemPrompt + '\n\n' + userText,
+          images: [base64],
+          stream: false,
+          format: 'json',
+          options: { temperature: 0.1 }
+        }),
+        signal: controller.signal
+      });
+    } else {
+      resp = await fetch(provider.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${provider.apiKey}`
+        },
+        body: JSON.stringify({
+          model: provider.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
+                { type: 'text', text: userText }
+              ]
+            }
+          ],
+          max_tokens: 512
+        }),
+        signal: controller.signal
+      });
+    }
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`识别服务返回 ${resp.status}${text ? '：' + text.substring(0, 120) : ''}`);
+    }
+
+    const data = await resp.json();
+    const content = provider.type === 'ollama' ? data.response : (data.choices?.[0]?.message?.content || '');
+
+    try {
+      return JSON.parse(content);
+    } catch { /* 回退到正则提取 */ }
+    const match = content.match(/[[{][\s\S]*[\]}]/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch { /* ignore */ }
+    }
+    return null;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error('识别超时，请重试或检查视觉服务配置');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// 手牌识别：提示词由 data.js 动态生成，只允许返回已知卡名
+async function recognizeHandCards(imageDataUrl) {
+  const known = getAllCards().map(c => c.name);
+  const system = `你是三国杀助手，负责识别照片中的手牌。只允许从以下卡牌中选择：${known.join('、')}。\n返回JSON：{"cards":["杀","闪"]}，同一张牌出现多张就重复列出；识别不到返回 {"cards":[]}。不要输出任何其他文字。`;
+  const result = await visionJSON(system, '请识别图中所有三国杀手牌，只返回JSON。', imageDataUrl);
+
+  let names = [];
+  if (Array.isArray(result)) {
+    names = result.map(x => (typeof x === 'string' ? x : (x && x.name) || ''));
+  } else if (result && Array.isArray(result.cards)) {
+    names = result.cards.map(x => (typeof x === 'string' ? x : (x && x.name) || ''));
+  }
+  return names
+    .map(n => String(n).replace(/[【】\s]/g, ''))
+    .filter(n => known.includes(n));
 }
 
 // ===== INSTALL BANNER =====
@@ -757,158 +1209,15 @@ async function captureAndRecognize() {
   }
 }
 
-// ===== VISION RECOGNITION =====
+// ===== VISION RECOGNITION (复用 visionJSON) =====
 async function recognizeWithVision(imageDataUrl) {
-  const provider = getActiveProvider();
-
-  if (provider.type === 'ollama') {
-    return await recognizeWithOllama(imageDataUrl, provider);
-  } else if (provider.type === 'openai') {
-    return await recognizeWithOpenAI(imageDataUrl, provider);
-  } else {
-    // Fallback to local facts matching
-    return { type: 'unknown', message: '未配置视觉识别模型，请检查 config.js' };
-  }
-}
-
-async function recognizeWithOllama(imageDataUrl, provider) {
-  const base64 = imageDataUrl.split(',')[1];
-
-  const payload = {
-    model: provider.model,
-    prompt: VISION_SYSTEM_PROMPT + '\n\n请直接返回JSON，不要包含任何其他文字。',
-    images: [base64],
-    stream: false,
-    format: 'json',
-    options: {
-      temperature: 0.1
-    }
-  };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), VISION_CONFIG.timeout);
-
-  try {
-    const resp = await fetch(provider.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-
-    if (!resp.ok) {
-      throw new Error(`Ollama 返回 ${resp.status}`);
-    }
-
-    const data = await resp.json();
-
-    // Parse JSON response from model
-    let parsed;
-    try {
-      parsed = JSON.parse(data.response);
-    } catch {
-      // Try to extract JSON from response text
-      const match = data.response.match(/\{[\s\S]*\}/);
-      if (match) {
-        parsed = JSON.parse(match[0]);
-      } else {
-        // Fallback: do local keyword matching
-        return localFallback(data.response);
-      }
-    }
-
-    return parsed;
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err.name === 'AbortError') {
-      throw new Error('识别超时，请确保 Ollama 已启动');
-    }
-    throw err;
-  }
-}
-
-async function recognizeWithOpenAI(imageDataUrl, provider) {
-  const base64 = imageDataUrl.split(',')[1];
-
-  const payload = {
-    model: provider.model,
-    messages: [
-      { role: 'system', content: VISION_SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${base64}` } },
-          { type: 'text', text: '请识别图片中的三国杀武将或卡牌，直接返回JSON格式结果。' }
-        ]
-      }
-    ],
-    max_tokens: 512
-  };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), VISION_CONFIG.timeout);
-
-  try {
-    const resp = await fetch(provider.endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${provider.apiKey}`
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      throw new Error(`OpenAI API 返回 ${resp.status}: ${text}`);
-    }
-
-    const data = await resp.json();
-    const content = data.choices?.[0]?.message?.content || '';
-
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      const match = content.match(/\{[\s\S]*\}/);
-      if (match) {
-        parsed = JSON.parse(match[0]);
-      } else {
-        return localFallback(content);
-      }
-    }
-
-    return parsed;
-  } catch (err) {
-    clearTimeout(timeout);
-    if (err.name === 'AbortError') {
-      throw new Error('识别超时，请检查网络连接');
-    }
-    throw err;
-  }
-}
-
-// ===== LOCAL FALLBACK =====
-function localFallback(text) {
-  // Simple keyword matching from AI's text description
-  const allNames = [
-    ...HEROES.map(h => h.name),
-    ...CARDS.basic_cards.map(c => c.name),
-    ...CARDS.trick_cards.map(c => c.name),
-    ...CARDS.equipment_cards.map(c => c.name)
-  ];
-
-  for (const name of allNames) {
-    if (text.includes(name)) {
-      const entry = FACTS_MAP[name];
-      if (entry) return { type: entry.type, name: name, confidence: 0.5, source: 'local' };
-    }
-  }
-
-  return { type: 'unknown', message: `未能在图中识别到三国杀武将或卡牌。AI回复：${text.substring(0, 100)}` };
+  const result = await visionJSON(
+    VISION_SYSTEM_PROMPT,
+    '请识别图片中的三国杀武将或卡牌，直接返回JSON格式结果。',
+    imageDataUrl
+  );
+  if (!result) return localFallback('');
+  return result;
 }
 
 // ===== DISPLAY RESULT =====
