@@ -34,6 +34,9 @@ let SGS_API_AVAILABLE = false;
 // ===== FACTS MAP (for local fallback) =====
 const FACTS_MAP = {};
 
+// ===== CACHED CARD LIST =====
+let _allCardsCache = null;
+
 // Build facts map from HEROES and CARDS
 function buildFacts() {
   Object.keys(FACTS_MAP).forEach(k => delete FACTS_MAP[k]);
@@ -47,6 +50,12 @@ function buildFacts() {
 
 // Initial build from data.js (fallback)
 buildFacts();
+
+// ===== DEBOUNCE HELPER =====
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
 
 // ===== API LOADER =====
 async function loadFromAPI() {
@@ -100,21 +109,15 @@ async function loadFromAPI() {
   }
 }
 
-// ===== CACHED CARD LIST =====
-let _allCardsCache = null;
-
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', async () => {
   // 先尝试从 API 加载
   await loadFromAPI();
 
   renderHeroes();
-  renderCards();
-  renderRules();
   renderAskExamples();
   setupInstallBanner();
   setupCameraTab();
-  _bindHeroPickerSearch();
 
   // 显示数据来源
   const sourceBadge = SGS_API_AVAILABLE ? '🌐 API' : '📱 本地';
@@ -122,6 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ===== TABS =====
+const _renderedTabs = new Set(['heroes']);
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -130,6 +134,14 @@ document.querySelectorAll('.tab').forEach(tab => {
     const id = tab.dataset.tab + 'Page';
     document.getElementById(id).classList.add('active');
     currentTab = tab.dataset.tab;
+
+    // Lazy render on first visit
+    if (!_renderedTabs.has(currentTab)) {
+      if (currentTab === 'cards') renderCards();
+      if (currentTab === 'rules') renderRules();
+      _renderedTabs.add(currentTab);
+    }
+
     if (currentTab === 'ask') {
       document.getElementById('askResult').innerHTML = '';
     }
@@ -173,7 +185,7 @@ function renderHeroes(heroes = HEROES) {
   list.innerHTML = filtered.map(h => {
     const tags = h.tags || [];
     const tagsHtml = tags.length > 0 ? `<div class="hero-tags">${tags.slice(0, 5).map(t => `<span class="hero-tag">${t}</span>`).join('')}</div>` : '';
-    return `<div class="hero-card" onclick="toggleHero(this)" data-hero="${h.name}" data-tags="${tags.join(',')}">
+    return `<div class="hero-card" onclick="toggleHero(this)" data-hero="${h.name}">
       <div class="hero-card-header">
         <div class="hero-avatar faction-${h.faction}">${h.name[0]}</div>
         <div>
@@ -199,10 +211,10 @@ function toggleHero(card) {
   card.classList.toggle('open');
 }
 
-document.getElementById('heroSearch').addEventListener('input', e => {
+document.getElementById('heroSearch').addEventListener('input', debounce(e => {
   heroFilter.search = e.target.value;
   renderHeroes();
-});
+}, 200));
 
 document.getElementById('factionPills').addEventListener('click', e => {
   const pill = e.target.closest('.pill');
@@ -233,11 +245,6 @@ function getAllCards() {
     ];
   }
   return _allCardsCache;
-}
-
-function cardTypeIcon(cat) {
-  const map = { basic: '🔴', trick: '🟣', equipment: '🔵' };
-  return map[cat] || '🔵';
 }
 
 function cardCssClass(cat, name) {
@@ -308,10 +315,10 @@ function toggleCard(item) {
   item.classList.toggle('open');
 }
 
-document.getElementById('cardSearch').addEventListener('input', e => {
+document.getElementById('cardSearch').addEventListener('input', debounce(e => {
   cardFilter.search = e.target.value;
   renderCards();
-});
+}, 200));
 
 document.getElementById('cardTypePills').addEventListener('click', e => {
   const pill = e.target.closest('.pill');
@@ -423,19 +430,17 @@ function getAnswer(q) {
   }
 
   // Faction heroes
-  const factionNames = { '蜀': '蜀', '魏': '魏', '吴': '吴', '群': '群' };
-  for (const [fname, fnameCN] of Object.entries(factionNames)) {
-    if (q.includes(fnameCN + '国') || q.includes(fname)) {
-      const heroes = HEROES.filter(h => h.faction === fnameCN);
-      return `【${fnameCN}势力武将】共${heroes.length}位：\n` +
+  for (const fname of ['蜀', '魏', '吴', '群']) {
+    if (q.includes(fname + '国') || q.includes(fname)) {
+      const heroes = HEROES.filter(h => h.faction === fname);
+      return `【${fname}势力武将】共${heroes.length}位：\n` +
         heroes.map(h => `• ${h.name}（${h.title}）`).join('\n');
     }
   }
 
   // Card match
-  const allCards = [...CARDS.basic_cards, ...CARDS.trick_cards, ...CARDS.equipment_cards];
-  for (const c of allCards) {
-    const cleanQ = q.replace(/【|】/g, '');
+  const cleanQ = q.replace(/【|】/g, '');
+  for (const c of getAllCards()) {
     if (cleanQ.includes(c.name) || c.name.includes(cleanQ)) {
       let result = `【${c.name}】（${c.type}）\n效果：${c.description}`;
       if (c.notes) result += `\n📌 ${c.notes}`;
@@ -494,7 +499,6 @@ let selectedHero = null;
 let heroPickerMode = 'team'; // 'team' = 配将页选主将, 'advice' = 出牌页选武将
 
 function showHeroPicker() {
-function showHeroPicker() {
   heroPickerMode = 'team';
   openHeroPicker('选择主将');
 }
@@ -508,7 +512,6 @@ function openHeroPicker(title) {
   document.querySelector('#heroPickerModal .modal-title').textContent = title;
   renderModalHeroes(HEROES);
   document.getElementById('heroPickerModal').classList.add('show');
-}
 }
 
 function renderModalHeroes(heroes) {
@@ -534,13 +537,13 @@ function closeHeroPicker() {
 }
 
 // 模态框搜索（只注册一次，避免重复绑定）
-document.getElementById('modalHeroSearch').addEventListener('input', e => {
+document.getElementById('modalHeroSearch').addEventListener('input', debounce(e => {
   const s = e.target.value.toLowerCase();
   const filtered = HEROES.filter(h =>
     h.name.toLowerCase().includes(s) || h.title.toLowerCase().includes(s)
   );
   renderModalHeroes(filtered);
-});
+}, 200));
 
 function selectHero(name) {
   closeHeroPicker();
@@ -770,10 +773,10 @@ document.getElementById('adviceSituationPills').addEventListener('click', e => {
 });
 
 // 手牌搜索过滤
-document.getElementById('adviceHandSearch').addEventListener('input', e => {
+document.getElementById('adviceHandSearch').addEventListener('input', debounce(e => {
   adviceHandSearch = e.target.value;
   renderAdviceHandCards();
-});
+}, 200));
 
 // ===== 手牌选择 =====
 let adviceHandSearch = '';
@@ -1218,6 +1221,17 @@ async function recognizeWithVision(imageDataUrl) {
   );
   if (!result) return localFallback('');
   return result;
+}
+
+// ===== LOCAL FALLBACK =====
+function localFallback(text) {
+  for (const name of Object.keys(FACTS_MAP)) {
+    if (text.includes(name)) {
+      const entry = FACTS_MAP[name];
+      return { type: entry.type, name, confidence: 0.5, source: 'local' };
+    }
+  }
+  return { type: 'unknown', message: `未能在图中识别到三国杀武将或卡牌。AI回复：${text.substring(0, 100)}` };
 }
 
 // ===== DISPLAY RESULT =====

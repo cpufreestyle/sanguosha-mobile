@@ -34,3 +34,9 @@ gradle/
 # Android
 local.properties
 *.log
+
+# macOS
+.DS_Store
+
+# Codely CLI local state
+.codely-cli/

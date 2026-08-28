@@ -289,6 +289,17 @@ A: 在 Gitee 仓库提交 Issue 即可。
 
 ## 🔄 更新日志
 
+### v1.4.1 (2026-08-27)
+- 🐛 修复 `_allCardsCache` 声明顺序错误引发 TDZ 崩溃，导致整个应用无法初始化（白屏）
+- 🐛 修复 `showHeroPicker` 重复声明导致配将/出牌页选将弹窗失效
+- 🐛 补回缺失的 `localFallback` 定义（视觉识别返回无法解析时不再报错）
+- 🐛 补上「出牌」tab 入口（v1.4.0 实现了完整功能但页面无法到达）
+- 🐛 移除初始化中残留的 `_bindHeroPickerSearch()` 调用（控制台报错）
+- 🐛 SW 预缓存移除 gitignored 的 `config.js`，避免新设备离线缓存安装失败
+- ⚡ 渲染性能优化：tab 懒渲染、搜索输入防抖 200ms
+- 🧹 清理冗余代码与无用 CSS（`cardTypeIcon`、`data-tags`、空状态/团队卡牌样式等）
+- 📦 Service Worker 缓存版本更新至 v1.4.1
+
 ### v1.4.0 (2026-07-11)
 - 🐛 修复「出牌建议」tab 引用未定义函数导致页面崩溃
 - 🐛 修复 `buildFacts()` 中 `FACTS_MAP.length = 0` 对对象无效的死代码

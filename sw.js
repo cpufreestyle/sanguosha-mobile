@@ -1,15 +1,14 @@
-const CACHE = 'sanguosha-v1.4';
+const CACHE = 'sanguosha-v1.4.1';
 const ASSETS = [
   './',
   './index.html',
   './data.js',
   './app.js',
-  './config.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
 ];
-// config.js is optional (may not exist on fresh clone)
+// config.js is optional (gitignored, may not exist on fresh clone)
 
 self.addEventListener('install', e => {
   e.waitUntil(
