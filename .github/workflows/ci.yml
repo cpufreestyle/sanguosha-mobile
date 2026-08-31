@@ -33,6 +33,30 @@ jobs:
         run: |
           python -c "import json; json.load(open('manifest.json')); print('manifest.json: valid')"
 
+      - name: Check JS syntax
+        run: |
+          node --check app.js
+          node --check sw.js
+          node --check data.js
+          echo "JS syntax: valid"
+
+      - name: Check Python syntax
+        run: |
+          python -m py_compile api/main.py build_apk.py make_icons.py
+          echo "Python syntax: valid"
+
+      - name: Check API data consistency
+        run: |
+          python -c "
+          import json, re
+          data = json.load(open('api/data.json', encoding='utf-8'))
+          version = data['VERSION']
+          m = re.search(r'VERSION = \"([\d.]+)\"', open('data.js', encoding='utf-8').read())
+          assert m, 'VERSION not found in data.js'
+          assert version == m.group(1), f'api/data.json VERSION ({version}) != data.js VERSION ({m.group(1)})'
+          print(f'data version consistent: {version}')
+          "
+
       - name: Check config example
         run: |
           test -f config.example.js && echo "config.example.js exists"

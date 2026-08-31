@@ -96,9 +96,8 @@ async function loadFromAPI() {
       if (s && s.synergy) window.SYNERGIES[s.name] = s.synergy;
     });
 
-    // 重建 FACTS_MAP 和卡片缓存
+    // 重置卡片缓存（数据可能已被 API 替换）
     _allCardsCache = null;
-    buildFacts();
     SGS_API_AVAILABLE = true;
     console.log('[SGS] API 数据加载完成');
     return true;
@@ -1219,8 +1218,8 @@ async function recognizeWithVision(imageDataUrl) {
     '请识别图片中的三国杀武将或卡牌，直接返回JSON格式结果。',
     imageDataUrl
   );
-  if (!result) return localFallback('');
-  return result;
+  // 返回内容无法解析为 JSON 时，交由展示层的 unknown 分支提示
+  return result || { type: 'unknown', message: '识别服务返回了无法解析的内容' };
 }
 
 // ===== LOCAL FALLBACK =====

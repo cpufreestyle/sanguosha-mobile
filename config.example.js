@@ -3,14 +3,17 @@
 //
 // cp config.example.js config.js
 //
-// 注意：config.js 已在 .gitignore 中，不会被提交到仓库
+// 注意：
+// 1. config.js 已在 .gitignore 中，不会被提交到仓库
+// 2. 必须使用 window.CONFIG / window.VISION_CONFIG 赋值形式，
+//    不要用 const 声明（会与 app.js 的声明冲突导致整个应用无法启动）
 
-const CONFIG = {
+window.CONFIG = {
   API_URL: 'http://localhost:8100',
   USE_API: true,
 };
 
-const VISION_CONFIG = {
+window.VISION_CONFIG = {
   providers: [
     {
       name: 'ollama',
@@ -40,7 +43,7 @@ const VISION_CONFIG = {
   timeout: 30000
 };
 
-const VISION_SYSTEM_PROMPT = `你是一个三国杀游戏助手，专门识别游戏画面中的武将和卡牌。
+window.VISION_SYSTEM_PROMPT = `你是一个三国杀游戏助手，专门识别游戏画面中的武将和卡牌。
 
 三国杀标准版包含以下武将：
 蜀国：刘备、关羽、张飞、诸葛亮、赵云

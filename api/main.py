@@ -32,15 +32,10 @@ VERSION = DATA["VERSION"]
 # 构建索引（快速查找）
 HEROES_BY_NAME = {h["name"]: h for h in HEROES}
 ALL_CARDS = (
-    [{"**category": "basic", **c} for c in CARDS["basic_cards"]]
-    + [{"**category": "trick", **c} for c in CARDS["trick_cards"]]
-    + [{"**category": "equipment", **c} for c in CARDS["equipment_cards"]]
+    [{"category": "basic", **c} for c in CARDS["basic_cards"]]
+    + [{"category": "trick", **c} for c in CARDS["trick_cards"]]
+    + [{"category": "equipment", **c} for c in CARDS["equipment_cards"]]
 )
-CARDS_BY_NAME = {c["name"]: c for c in ALL_CARDS}
-
-# 修复键名（去掉 ** 前缀）
-for c in ALL_CARDS:
-    c["category"] = c.pop("**category", "")
 CARDS_BY_NAME = {c["name"]: c for c in ALL_CARDS}
 
 # ============================================================
