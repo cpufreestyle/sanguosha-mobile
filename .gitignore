@@ -40,3 +40,4 @@ local.properties
 
 # Codely CLI local state
 .codely-cli/
+CODELY.md

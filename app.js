@@ -18,7 +18,7 @@ const VISION_SYSTEM_PROMPT = window.VISION_SYSTEM_PROMPT || `你是一个三国�
 
 let currentTab = 'heroes';
 let heroFilter = { faction: 'all', search: '', tag: 'all' };
-let cardFilter = { type: 'all', search: '' };
+let cardFilter = { type: 'all', search: '', expansion: 'all' };
 let deferredPrompt = null;
 
 // ===== CAMERA STATE =====
@@ -117,6 +117,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderAskExamples();
   setupInstallBanner();
   setupCameraTab();
+  setupDistCalc();
+  setupAskMic();
 
   // 显示数据来源
   const sourceBadge = SGS_API_AVAILABLE ? '🌐 API' : '📱 本地';
@@ -257,6 +259,8 @@ function renderCards() {
   const container = document.getElementById('cardList');
   const all = getAllCards().filter(c => {
     if (cardFilter.type !== 'all' && c._cat !== cardFilter.type) return false;
+    if (cardFilter.expansion === 'standard' && c.expansion === '军争') return false;
+    if (cardFilter.expansion === 'military' && c.expansion !== '军争') return false;
     if (cardFilter.search) {
       const s = cardFilter.search.toLowerCase();
       if (!c.name.toLowerCase().includes(s) && !c.type.toLowerCase().includes(s)) return false;
@@ -296,7 +300,7 @@ function cardHTML(c) {
       <div class="card-header">
         <div class="card-icon ${cardCssClass(c._cat, c.name)}">${c.name}</div>
         <div>
-          <div class="card-name">【${c.name}】</div>
+          <div class="card-name">【${c.name}】${c.expansion === '军争' ? '<span style="font-size:10px;color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:1px 5px;margin-left:4px;vertical-align:2px">军争</span>' : ''}</div>
           <div class="card-type-label">${c.type}</div>
         </div>
         <div class="card-arrow">▼</div>
@@ -325,6 +329,15 @@ document.getElementById('cardTypePills').addEventListener('click', e => {
   document.querySelectorAll('#cardTypePills .pill').forEach(p => p.classList.remove('active'));
   pill.classList.add('active');
   cardFilter.type = pill.dataset.type;
+  renderCards();
+});
+
+document.getElementById('cardExpansionPills').addEventListener('click', e => {
+  const pill = e.target.closest('.pill');
+  if (!pill) return;
+  document.querySelectorAll('#cardExpansionPills .pill').forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
+  cardFilter.expansion = pill.dataset.exp;
   renderCards();
 });
 
@@ -381,6 +394,42 @@ function toggleRule(card) {
   card.classList.toggle('open');
 }
 
+// ===== 距离计算器（规则页） =====
+function setupDistCalc() {
+  const players = document.getElementById('dcPlayers');
+  const offset = document.getElementById('dcOffset');
+  if (!players || !offset) return;
+
+  function fillOffsets() {
+    const n = parseInt(players.value, 10);
+    offset.innerHTML = Array.from({ length: n - 1 }, (_, i) =>
+      `<option value="${i + 1}" ${i === 0 ? 'selected' : ''}>${i + 1}</option>`
+    ).join('');
+  }
+  fillOffsets();
+
+  function baseDistance(n, k) {
+    return Math.min(k, n - k);
+  }
+  function update() {
+    const n = parseInt(players.value, 10);
+    const k = parseInt(offset.value, 10);
+    const weapon = parseInt(document.getElementById('dcWeapon').value, 10);
+    const myMinus = document.getElementById('dcMyMinus').checked;
+    const targetPlus = document.getElementById('dcTargetPlus').checked;
+    const base = baseDistance(n, k);
+    const dist = Math.max(1, base - (myMinus ? 1 : 0) + (targetPlus ? 1 : 0));
+    const hit = dist <= weapon;
+    document.getElementById('dcResult').innerHTML =
+      `基础距离（顺/逆时针取短）：<b>${base}</b><br/>` +
+      `实际距离${myMinus ? '（我-1马）' : ''}${targetPlus ? '（目标+1马）' : ''}：<b>${dist}</b> ｜ 你的攻击范围：<b>${weapon}</b><br/>` +
+      (hit ? `✅ <b style="color:var(--shu)">可以攻击到</b>` : `❌ <b style="color:var(--wei)">攻击不到</b>（差 ${dist - weapon} 距离，考虑-1马或更远武器）`);
+  }
+  [players, offset, document.getElementById('dcWeapon'), document.getElementById('dcMyMinus'), document.getElementById('dcTargetPlus')]
+    .forEach(el => el.addEventListener('change', () => { if (el === players) fillOffsets(); update(); }));
+  update();
+}
+
 // ===== ASK =====
 function renderAskExamples() {
   const examples = [
@@ -408,12 +457,172 @@ function renderAskExamples() {
 }
 
 function askQuestion(question) {
-  const answer = getAnswer(question);
   const result = document.getElementById('askResult');
+  if (askAIMode) {
+    result.innerHTML = `
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">👤 ${question}</div>
+      <div class="ask-result">🤖 <span class="recog-loading-dot">●●●</span> AI 思考中…</div>
+    `;
+    askLLM(question)
+      .then(answer => {
+        result.innerHTML = `
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">👤 ${question}</div>
+          <div class="ask-result">🤖 ${answer}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">来源：${getActiveProvider().label} · 数据已结合本地资料</div>
+        `;
+      })
+      .catch(err => {
+        const answer = getAnswer(question);
+        result.innerHTML = `
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">👤 ${question}</div>
+          <div class="ask-result">🤖 ${answer}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">⚠️ AI 不可用（${err.message}），已回退本地关键词匹配</div>
+        `;
+      });
+    return;
+  }
+  const answer = getAnswer(question);
   result.innerHTML = `
     <div style="font-size:12px;color:var(--text2);margin-bottom:8px">👤 ${question}</div>
     <div class="ask-result">🤖 ${answer}</div>
   `;
+}
+
+// ===== AI 问答（复用视觉识别的 provider 配置做纯文本对话） =====
+let askAIMode = false;
+
+function toggleAskAI(pill) {
+  askAIMode = !askAIMode;
+  pill.classList.toggle('active', askAIMode);
+  pill.textContent = askAIMode ? '🤖 AI 问答（开）' : '🤖 AI 问答';
+  if (askAIMode) {
+    document.getElementById('askResult').innerHTML =
+      '<div style="font-size:12px;color:var(--text2);padding:4px 0">AI 模式已开启：回答将结合本地武将/卡牌资料与「' + getActiveProvider().label + '」，未配置服务时自动回退本地匹配。</div>';
+  }
+}
+
+// 按问题关键词从本地数据库抽取上下文（轻量 RAG）
+function buildAskContext(q) {
+  const parts = [];
+  const cleanQ = q.replace(/【|】/g, '');
+  HEROES.forEach(h => {
+    if (cleanQ.includes(h.name)) {
+      parts.push(`【武将】${h.name}（${h.faction}，${h.health}体力）：` +
+        h.skills.map(s => `${s.name}（${s.type}）：${s.description}`).join('；'));
+    }
+  });
+  getAllCards().forEach(c => {
+    if (cleanQ.includes(c.name)) {
+      parts.push(`【卡牌】${c.name}（${c.type}）：${c.description}${c.notes ? ' 备注：' + c.notes : ''}`);
+    }
+  });
+  (RULES.skill_types || []).forEach(st => {
+    if (cleanQ.includes(st.name)) parts.push(`【技能类型】${st.name}：${st.description}`);
+  });
+  if (!parts.length) {
+    parts.push('（问题未命中具体条目，请依据三国杀标准版规则回答，可提及军争篇）');
+  }
+  return parts.join('\n');
+}
+
+async function askLLM(question) {
+  const provider = getActiveProvider();
+  if (provider.type !== 'ollama' && !provider.apiKey) {
+    throw new Error(`「${provider.label}」未配置 API Key`);
+  }
+  const system = '你是三国杀游戏助手，用简洁的中文回答玩家问题，要点式排版。优先依据下面给出的本地资料回答，资料不足时依据标准版（含军争篇）规则回答，不要编造不存在的武将或卡牌。\n\n本地资料：\n' + buildAskContext(question);
+  return await chatText(system, question);
+}
+
+// 纯文本对话（ollama / openai 两种 provider）
+async function chatText(systemPrompt, userText) {
+  const provider = getActiveProvider();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), VISION_CONFIG.timeout);
+  try {
+    let resp;
+    if (provider.type === 'ollama') {
+      resp = await fetch(provider.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: provider.model,
+          prompt: systemPrompt + '\n\n用户问题：' + userText,
+          stream: false,
+          options: { temperature: 0.4 }
+        }),
+        signal: controller.signal
+      });
+    } else {
+      resp = await fetch(provider.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${provider.apiKey}`
+        },
+        body: JSON.stringify({
+          model: provider.model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userText }
+          ],
+          max_tokens: 512
+        }),
+        signal: controller.signal
+      });
+    }
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      throw new Error(`服务返回 ${resp.status}${text ? '：' + text.substring(0, 80) : ''}`);
+    }
+    const data = await resp.json();
+    const content = provider.type === 'ollama' ? data.response : (data.choices?.[0]?.message?.content || '');
+    if (!content) throw new Error('服务返回空内容');
+    return content.replace(/\n/g, '<br/>');
+  } catch (err) {
+    if (err.name === 'AbortError') throw new Error('请求超时');
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ===== 语音输入（Web Speech API，不支持则隐藏按钮） =====
+function setupAskMic() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById('askMicBtn');
+  if (!SR || !btn) return;
+  btn.style.display = '';
+  let rec = null;
+  let listening = false;
+  btn.addEventListener('click', () => {
+    if (listening) { rec.stop(); return; }
+    rec = new SR();
+    rec.lang = 'zh-CN';
+    rec.interimResults = false;
+    rec.onstart = () => {
+      listening = true;
+      btn.classList.add('active');
+      btn.textContent = '🎙️ 听写中…';
+    };
+    rec.onresult = e => {
+      const text = e.results[0][0].transcript.trim();
+      const input = document.getElementById('askInput');
+      if (text) {
+        input.value = text;
+        askQuestion(text);
+        input.value = '';
+      }
+    };
+    const reset = () => {
+      listening = false;
+      btn.classList.remove('active');
+      btn.textContent = '🎤 语音';
+    };
+    rec.onend = reset;
+    rec.onerror = reset;
+    rec.start();
+  });
 }
 
 function getAnswer(q) {
@@ -693,6 +902,16 @@ const CARD_ADVICE_RULES = {
   '乐不思蜀': { action: 'use', reason: '延时控制，优先压给敌方核心输出位' },
   '闪电': { action: 'situational', reason: '高风险延时锦囊，劣势可赌，优势慎用' },
   '桃园结义': { action: 'situational', reason: '己方整体掉血时使用收益最大' },
+  '无懈可击': { action: 'hold', reason: '响应式反制牌，留在手中才能护住关键判定/队友' },
+  '酒': { action: 'situational', reason: '与【杀】配合伤害+1；濒死时可当【桃】救自己，注意每回合限一次' },
+  '火杀': { action: 'use', reason: '对连环/藤甲目标优先使用，火焰伤害可传导' },
+  '雷杀': { action: 'use', reason: '对连环状态目标使用可传导雷电伤害' },
+  '火攻': { action: 'situational', reason: '需要有同花色手牌配合，对手牌多的敌人收益更高' },
+  '铁索连环': { action: 'situational', reason: '先连环再属性伤害打出群体效果；残血时可重置自己保命' },
+  '兵粮寸断': { action: 'use', reason: '延时压制敌方核心，限制其摸牌' },
+  '藤甲': { action: 'situational', reason: '免疫普通杀和AOE，但受到火焰伤害+1，场上有火杀/火攻时慎穿' },
+  '朱雀羽扇': { action: 'use', reason: '普通杀转火杀，配合连环、克制藤甲' },
+  '古锭刀': { action: 'use', reason: '目标没有手牌时伤害+1，配合拆牌/牵牌使用' },
   '诸葛连弩': { action: 'use', reason: '装备后【杀】无次数限制，配合多张【杀】爆发' },
   '青釭剑': { action: 'use', reason: '装备克制八卦阵、仁王盾等防具' },
   '丈八蛇矛': { action: 'use', reason: '两张手牌当一张【杀】，缺【杀】时应急' },
@@ -711,11 +930,14 @@ const ADVICE_PLAY_ORDER = {
   '过河拆桥': 3,
   '顺手牵羊': 3,
   '乐不思蜀': 4,
+  '兵粮寸断': 4,
   '桃园结义': 5,
+  '铁索连环': 5,
   '诸葛连弩': 6, '青釭剑': 6, '丈八蛇矛': 6, '贯石斧': 6, '青龙偃月刀': 6,
-  '八卦阵': 6, '仁王盾': 6, '+1马': 6, '-1马': 6,
+  '八卦阵': 6, '仁王盾': 6, '藤甲': 6, '朱雀羽扇': 6, '古锭刀': 6, '+1马': 6, '-1马': 6,
+  '酒': 7, '火杀': 7, '雷杀': 7,
   '杀': 7,
-  '决斗': 8, '南蛮入侵': 8, '万箭齐发': 8,
+  '决斗': 8, '南蛮入侵': 8, '万箭齐发': 8, '火攻': 8,
   '闪电': 9,
   '桃': 10
 };

@@ -622,6 +622,11 @@
       <div class="pill" data-type="trick">锦囊牌</div>
       <div class="pill" data-type="equipment">装备牌</div>
     </div>
+    <div class="category-pills" id="cardExpansionPills">
+      <div class="pill active" data-exp="all">全扩展</div>
+      <div class="pill" data-exp="standard">标准版</div>
+      <div class="pill" data-exp="military">军争篇</div>
+    </div>
     <div id="cardList"></div>
   </div>
 
@@ -653,6 +658,48 @@
 
   <!-- ===== 规则页 ===== -->
   <div class="page" id="rulesPage">
+    <div class="section-title">🧮 实战工具</div>
+    <div class="rule-card open">
+      <div class="rule-header" onclick="toggleRule(this.parentElement)">
+        <span>📏 距离/攻击范围计算器</span>
+        <span class="rule-arrow">▼</span>
+      </div>
+      <div class="rule-body" id="distCalcBody">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <label style="font-size:12px;color:var(--text2)">总人数
+            <select id="dcPlayers" style="width:100%;margin-top:2px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">
+              <option>2</option><option>3</option><option>4</option><option>5</option><option selected>6</option><option>7</option><option>8</option>
+            </select>
+          </label>
+          <label style="font-size:12px;color:var(--text2)">目标在你顺时针第几位
+            <select id="dcOffset" style="width:100%;margin-top:2px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)"></select>
+          </label>
+          <label style="font-size:12px;color:var(--text2)">武器攻击范围
+            <select id="dcWeapon" style="width:100%;margin-top:2px;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);color:var(--text)">
+              <option value="1" selected>1（无武器）</option><option value="2">2（青釭剑/寒冰剑等）</option><option value="3">3（贯石斧/蛇矛等）</option><option value="4">4（方天画戟/羽扇）</option><option value="5">5（麒麟弓）</option>
+            </select>
+          </label>
+          <div style="font-size:12px;color:var(--text2);display:flex;flex-direction:column;gap:4px;justify-content:center">
+            <label><input type="checkbox" id="dcMyMinus" /> 我装了-1马</label>
+            <label><input type="checkbox" id="dcTargetPlus" /> 目标装了+1马</label>
+          </div>
+        </div>
+        <div id="dcResult" style="padding:8px;background:var(--bg3);border-radius:6px;font-size:13px;line-height:1.7"></div>
+      </div>
+    </div>
+    <div class="rule-card">
+      <div class="rule-header" onclick="toggleRule(this.parentElement)">
+        <span>🎲 判定概率速查</span>
+        <span class="rule-arrow">▼</span>
+      </div>
+      <div class="rule-body" style="font-size:13px;line-height:2">
+        <div>🛡️ <b>八卦阵</b>：判定为红即出【闪】→ 约 <b>50%</b>（红黑各半）</div>
+        <div>😋 <b>乐不思蜀</b>：判定非红桃才生效 → 约 <b>85%</b> 生效（红桃少数）</div>
+        <div>🍚 <b>兵粮寸断</b>：判定非梅花才生效 → 约 <b>80%</b> 生效（梅花约1/5）</div>
+        <div>⚡ <b>闪电</b>：黑桃2~9 共8张 → 每次 <b>约7%</b> 即死（3雷伤），长期挂闪电极危险</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">按标准108张牌堆粗略估算，改判技能（鬼才/鬼道/天命）会显著影响结果</div>
+      </div>
+    </div>
     <div class="rule-section" id="rulesList"></div>
   </div>
 
@@ -740,6 +787,10 @@
       <strong>试试这样问：</strong>
     </div>
     <div class="ask-examples" id="askExamples"></div>
+    <div style="display:flex;gap:8px;align-items:center;padding:8px 0 0">
+      <div class="pill" id="askAIToggle" onclick="toggleAskAI(this)">🤖 AI 问答</div>
+      <div class="pill" id="askMicBtn" style="display:none">🎤 语音</div>
+    </div>
     <div class="search-wrap" style="padding:8px 0 0">
       <div class="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
