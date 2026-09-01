@@ -2,7 +2,7 @@
 const VERSION = "1.4.0";
 
 // 三国杀助手 - 游戏数据
-const HEROES = [
+var HEROES = [
   // 蜀势力
   {name:"刘备",title:"仁德之君",faction:"蜀",health:4,tags:["辅助","摸牌","给牌"],skills:[{name:"仁德",type:"主动技",description:"出牌阶段，你可以将任意张手牌交给其他角色，然后你于此阶段内给出第二张'仁德'牌时，你回复1点体力。"}]},
   {name:"关羽",title:"美髯公",faction:"蜀",health:4,tags:["菜刀"],skills:[{name:"武圣",type:"锁定技",description:"你可以将一张红色牌当【杀】使用或打出。"}]},
@@ -35,7 +35,7 @@ const HEROES = [
 ];
 
 // ===== 标签筛选数据 =====
-const ALL_TAGS = [
+var ALL_TAGS = [
   {key:"爆发", label:"💥 爆发", desc:"一回合内造成大量伤害"},
   {key:"控制", label:"🎯 控制", desc:"限制对手行动"},
   {key:"辅助", label:"💊 辅助", desc:"支援队友"},
@@ -61,7 +61,7 @@ const ALL_TAGS = [
 ];
 
 // 武将配合关系（key英雄推荐配合的其他英雄）
-const SYNERGIES = {
+var SYNERGIES = {
   '刘备': {
     partners: ['关羽', '张飞', '赵云', '诸葛亮', '黄忠', '马超'],
     reason: '刘备的【仁德】可以将手牌交给队友，蜀国武将普遍依赖手牌执行技能，配合极佳',
@@ -215,12 +215,12 @@ const SYNERGIES = {
 };
 
 // 通用推荐数据
-const GENERAL_TIP = {
+var GENERAL_TIP = {
   cards: ['杀', '闪', '桃'],
   tip: '根据武将技能选择合适的配合'
 };
 
-const TEAM_COMPOSITIONS = {
+var TEAM_COMPOSITIONS = {
   balanced: {
     name: '均衡阵容',
     desc: '攻守兼备，适合新手',
@@ -243,7 +243,7 @@ const TEAM_COMPOSITIONS = {
   }
 };
 
-const CARDS = {
+var CARDS = {
   basic_cards: [
     {name:"杀",type:"基本牌",description:"出牌阶段，对你攻击范围内的一名其他角色使用。该角色需打出一张【闪】，否则受到1点伤害。",notes:"每回合通常只能使用一张【杀】（除非有技能改变）"},
     {name:"闪",type:"基本牌",description:"当一张【杀】指定你为目标时，你可以打出一张【闪】，抵消此【杀】的效果。",notes:"【闪】只能在响应【杀】时使用"},
@@ -274,7 +274,7 @@ const CARDS = {
   ]
 };
 
-const RULES = {
+var RULES = {
   basic_rules: [
     {title:"游戏目标",content:"主公和忠臣的目标是消灭所有反贼和内奸；反贼的目标是杀死主公；内奸的目标是在主公存活的情况下杀死所有其他角色，最后与主公单挑并获胜。"},
     {title:"游戏流程",content:"1. 准备阶段：部分技能在此阶段触发\n2. 判定阶段：处理延时锦囊的判定\n3. 摸牌阶段：摸两张牌\n4. 出牌阶段：使用手牌和技能\n5. 弃牌阶段：弃置超出手牌上限的牌\n6. 结束阶段：部分技能在此阶段触发"},
