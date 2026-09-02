@@ -1,4 +1,4 @@
-const CACHE = 'sanguosha-v1.5.0';
+const CACHE = 'sanguosha-v1.6.0';
 // 注意：不要把 config.js 放进预缓存列表——它是 gitignored 文件，fresh clone 时不存在，
 // addAll 遇到 404 会让整个 SW 安装失败；config.js 由 fetch 处理器运行时按需缓存。
 const ASSETS = [

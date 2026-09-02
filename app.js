@@ -459,6 +459,12 @@ function renderAskExamples() {
 
 function askQuestion(question) {
   const result = document.getElementById('askResult');
+  // 眼镜/自动播报：任何方式的提问，回答都口播（眼镜模式常开自动播报）
+  const speakAnswer = () => {
+    if (!voiceAutoSpeak || !VOICE_SUPPORTED) return;
+    const answerEl = document.querySelector('#askResult .ask-result');
+    if (answerEl) speak(answerEl.textContent);
+  };
   if (askAIMode) {
     result.innerHTML = `
       <div style="font-size:12px;color:var(--text2);margin-bottom:8px">👤 ${question}</div>
@@ -471,6 +477,7 @@ function askQuestion(question) {
           <div class="ask-result">🤖 ${answer}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:4px">来源：${getActiveProvider().label} · 数据已结合本地资料</div>
         `;
+        speakAnswer();
       })
       .catch(err => {
         const answer = getAnswer(question);
@@ -479,6 +486,7 @@ function askQuestion(question) {
           <div class="ask-result">🤖 ${answer}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:4px">⚠️ AI 不可用（${err.message}），已回退本地关键词匹配</div>
         `;
+        speakAnswer();
       });
     return;
   }
@@ -487,6 +495,7 @@ function askQuestion(question) {
     <div style="font-size:12px;color:var(--text2);margin-bottom:8px">👤 ${question}</div>
     <div class="ask-result">🤖 ${answer}</div>
   `;
+  speakAnswer();
 }
 
 // ===== AI 问答（复用视觉识别的 provider 配置做纯文本对话） =====
@@ -611,11 +620,8 @@ function setupAskMic() {
       const input = document.getElementById('askInput');
       if (text) {
         input.value = text;
-        askQuestion(text);
+        askQuestion(text); // 播报由 askQuestion 统一处理（眼镜场景音频经蓝牙路由到眼镜）
         input.value = '';
-        // 语音提问后自动播报答案（AI 眼镜场景：音频经蓝牙路由到眼镜扬声器）
-        const answerEl = document.querySelector('#askResult .ask-result');
-        if (answerEl) speak(answerEl.textContent);
       }
     };
     const reset = () => {
@@ -905,14 +911,31 @@ function speak(text) {
   speechSynthesis.cancel();
   // 去掉符号与表情，TTS 只读正文
   const clean = String(text)
-    .replace(/[【】\n•✨📋🃏🎯💡❤️⚔️🔴🟣🔵📌🤖👤🔊🔇]/g, ' ')
+    .replace(/[【】\n•✨📋🃏🎯💡❤️⚔️🔴🟣🔵📌🤖👤🔊🔇🕶️]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (!clean) return;
-  const u = new SpeechSynthesisUtterance(clean);
-  u.lang = 'zh-CN';
-  u.rate = 1.05;
-  speechSynthesis.speak(u);
+  // 分句队列播报：蓝牙音频传输长文本易被截断，逐句 utterance 更稳
+  const sentences = clean.split(/([。！？；])/).reduce((acc, part, i) => {
+    if (i % 2 === 0) acc.push((part + (i + 1 < clean.length ? '' : '')));
+    else acc[acc.length - 1] += part;
+    return acc;
+  }, []).map(s => s.trim()).filter(Boolean);
+  // 眼镜模式：语速放缓适配"听"的场景
+  const rate = glassesMode ? 0.95 : 1.05;
+  if (sentences.length <= 1) {
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = 'zh-CN';
+    u.rate = rate;
+    speechSynthesis.speak(u);
+    return;
+  }
+  sentences.forEach(s => {
+    const u = new SpeechSynthesisUtterance(s);
+    u.lang = 'zh-CN';
+    u.rate = rate;
+    speechSynthesis.speak(u);
+  });
 }
 
 // 当前建议压缩为口播文本
@@ -963,6 +986,119 @@ function initVoiceUI() {
   }
   const micBtn = document.getElementById('askMicBtn');
   if (micBtn && !RECOG_SUPPORTED) micBtn.style.display = 'none';
+  const glassesBtn = document.getElementById('glassesToggle');
+  if (glassesBtn) {
+    glassesBtn.classList.toggle('active', glassesMode);
+    glassesBtn.textContent = glassesMode ? '🕶️ 眼镜模式:开' : '🕶️ 眼镜模式';
+  }
+}
+
+// ===== GLASSES MODE (BOLON AI 眼镜联动) =====
+// BOLON AI 智能眼镜（Rokid 方案）：蓝牙音频直连手机（TTS/ASR 自动路由），照片经 Rokid AI App 同步到相册。
+// 眼镜模式 = 自动播报常开 + 放缓语速 + 全场景结果口播 + 相册导入识别入口。
+let glassesMode = localStorage.getItem('sanguosha_glasses') === 'on';
+
+function toggleGlassesMode() {
+  glassesMode = !glassesMode;
+  localStorage.setItem('sanguosha_glasses', glassesMode ? 'on' : 'off');
+  const btn = document.getElementById('glassesToggle');
+  if (btn) {
+    btn.classList.toggle('active', glassesMode);
+    btn.textContent = glassesMode ? '🕶️ 眼镜模式:开' : '🕶️ 眼镜模式';
+  }
+  // 眼镜模式联动自动播报（保持两个开关状态一致，避免互相覆盖）
+  if (glassesMode !== voiceAutoSpeak) setAutoSpeak(glassesMode);
+  if (glassesMode && VOICE_SUPPORTED) {
+    speak('眼镜模式已开启。识别结果和问答回答将自动通过眼镜播报。');
+  } else if (!glassesMode) {
+    speechSynthesis.cancel();
+  }
+}
+
+function openGlassesGuide() {
+  document.getElementById('glassesGuideModal').classList.add('show');
+}
+
+function closeGlassesGuide() {
+  document.getElementById('glassesGuideModal').classList.remove('show');
+}
+
+// 相册导入识别：适配"眼镜拍桌 → 相册同步 → 导入识别 → 语音播报"流程
+async function recognizeFromAlbum(input, mode) {
+  const file = input.files && input.files[0];
+  input.value = ''; // 允许重复选择同一张照片
+  if (!file) return;
+  if (!file.type.startsWith('image/')) return;
+
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('读取图片失败'));
+    reader.readAsDataURL(file);
+  }).catch(err => {
+    const el = document.getElementById(mode === 'advice' ? 'adviceRecognizeResult' : 'recognizeResult');
+    if (el) el.innerHTML = `<div class="recog-error">❌ ${err.message}</div>`;
+    return null;
+  });
+  if (!dataUrl) return;
+
+  if (mode === 'advice') {
+    const resultEl = document.getElementById('adviceRecognizeResult');
+    resultEl.innerHTML = `
+      <div class="recog-loading">
+        <div style="font-size:32px;margin-bottom:8px">🔍</div>
+        <div>正在识别相册手牌...</div>
+        <div class="recog-loading-dot" style="margin-top:6px">●●●</div>
+      </div>`;
+    try {
+      const names = await recognizeHandCards(dataUrl);
+      if (names.length === 0) {
+        resultEl.innerHTML = `<div class="recog-error">未能识别到手牌，请换一张更清晰的照片</div>`;
+        return;
+      }
+      names.forEach(n => adviceHand.push(n));
+      renderAdviceHandCards();
+      const counts = {};
+      names.forEach(n => counts[n] = (counts[n] || 0) + 1);
+      const summary = `已从相册添加：${Object.entries(counts).map(([n, c]) => `${n}×${c}`).join('、')}`;
+      resultEl.innerHTML = `<div style="font-size:13px;color:var(--shu)">✅ ${summary}</div>`;
+      setTimeout(() => closeAdviceCamera(), 900);
+    } catch (err) {
+      console.error('Album hand recognition error:', err);
+      resultEl.innerHTML = `<div class="recog-error">❌ 识别失败: ${err.message}</div>`;
+    }
+    return;
+  }
+
+  // 主识别页：复用拍照识别管线与结果展示
+  const resultEl = document.getElementById('recognizeResult');
+  resultEl.innerHTML = `
+    <div class="recog-loading">
+      <div style="font-size:32px;margin-bottom:8px">🔍</div>
+      <div>正在识别相册图片...</div>
+      <div class="recog-loading-dot" style="margin-top:6px">●●●</div>
+    </div>`;
+  try {
+    const result = await recognizeWithVision(dataUrl);
+    displayRecognizeResult(result, dataUrl);
+  } catch (err) {
+    console.error('Album recognition error:', err);
+    resultEl.innerHTML = `<div class="recog-error">❌ 识别失败: ${err.message}</div>`;
+  }
+}
+
+// 识别结果口播文本（精简，适合"听"）
+function resultSpeechText(result) {
+  if (!result) return '';
+  if (result.type === 'unknown') return result.message || '未能识别到武将或卡牌';
+  const entry = FACTS_MAP[result.name];
+  if (!entry) return `识别到${result.name}，但数据库未收录`;
+  if (entry.type === 'hero') {
+    const h = entry.data;
+    return `识别到武将${h.name}。` + h.skills.map(s => `技能${s.name}：${s.description}`).join('。');
+  }
+  const c = entry.data;
+  return `识别到卡牌${c.name}。${c.description}`;
 }
 
 // ===== ADVICE (出牌建议) =====
@@ -1557,6 +1693,9 @@ function displayRecognizeResult(result, imageDataUrl) {
     resultEl.innerHTML = `<div class="recog-error">❌ 识别服务无响应</div>`;
     return;
   }
+
+  // 眼镜/自动播报：结果口播（拍照与相册导入共用此出口）
+  if (voiceAutoSpeak && VOICE_SUPPORTED) speak(resultSpeechText(result));
 
   // Unknown
   if (result.type === 'unknown') {

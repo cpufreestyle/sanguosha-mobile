@@ -588,6 +588,10 @@
 <main>
   <!-- ===== 武将页 ===== -->
   <div class="page active" id="heroesPage">
+    <div id="glassesBar" style="display:flex;align-items:center;gap:8px;padding:8px 12px 0">
+      <div class="pill" id="glassesToggle" onclick="toggleGlassesMode()">🕶️ 眼镜模式</div>
+      <div style="font-size:11px;color:var(--text2);flex:1;cursor:pointer" onclick="openGlassesGuide()">BOLON AI 眼镜联动 · 怎么用？</div>
+    </div>
     <div class="search-wrap">
       <div class="search-box">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -669,8 +673,10 @@
       <!-- 操作按钮 -->
       <div class="camera-controls">
         <button class="cam-btn cam-btn-secondary" id="switchCameraBtn" onclick="switchCamera()">🔄 切换摄像头</button>
+        <button class="cam-btn cam-btn-secondary" onclick="document.getElementById('albumInputMain').click()">🖼️ 相册导入</button>
         <button class="cam-btn cam-btn-primary" id="captureBtn" onclick="captureAndRecognize()">📸 拍照识别</button>
       </div>
+      <input type="file" id="albumInputMain" accept="image/*" style="display:none" onchange="recognizeFromAlbum(this, 'main')" />
 
       <!-- 识别结果 -->
       <div id="recognizeResult"></div>
@@ -798,8 +804,10 @@
       </div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="cam-btn" onclick="switchAdviceCamera()" style="flex:1">🔄 翻转</button>
+        <button class="cam-btn" onclick="document.getElementById('albumInputAdvice').click()" style="flex:1">🖼️ 相册</button>
         <button class="cam-btn cam-btn-primary" id="adviceCaptureBtn" onclick="captureAdviceCards()" style="flex:2">📸 拍照识别手牌</button>
       </div>
+      <input type="file" id="albumInputAdvice" accept="image/*" style="display:none" onchange="recognizeFromAlbum(this, 'advice')" />
       <div id="adviceRecognizeResult" style="margin-top:10px"></div>
     </div>
   </div>
@@ -825,9 +833,26 @@
   </div>
 </main>
 
-<!-- Hero Picker Modal -->
-<div class="modal-overlay" id="heroPickerModal">
+<!-- Glasses Guide Modal -->
+<div class="modal-overlay" id="glassesGuideModal" onclick="if(event.target===this)closeGlassesGuide()">
   <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">🕶️ BOLON AI 眼镜联动指南</div>
+      <button class="modal-close" onclick="closeGlassesGuide()">✕</button>
+    </div>
+    <div style="font-size:13px;line-height:2;color:var(--text)">
+      <div style="font-weight:bold;color:var(--gold);margin-bottom:4px">适用：BOLON AI 智能眼镜（Rokid 乐奇方案）</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">眼镜无屏，通过蓝牙音频 + 拍照与本应用联动，无需额外 SDK。</div>
+      <div>1️⃣ <b>连接音频</b>：眼镜开机后与手机完成蓝牙配对，本应用的语音播报/语音问答会自动经眼镜扬声器播放。</div>
+      <div>2️⃣ <b>开启眼镜模式</b>：返回武将页打开「🕶️ 眼镜模式」——识别结果、问答回答将自动口播（语速放缓，适合"听"）。</div>
+      <div>3️⃣ <b>第一视角识别</b>：戴镜对准桌面拍照（眼镜按键），照片同步到手机相册后在「📷 识别」或「出牌」页点「🖼️ 相册导入」即可识别。</div>
+      <div style="margin-top:10px;padding:8px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text2)">提示：也可以直接用手机摄像头拍照识别（📸 按钮），流程相同。识别由你配置的视觉模型完成（默认本地 Ollama）。</div>
+    </div>
+  </div>
+</div>
+
+<!-- Hero Picker Modal -->
+<div class="modal-overlay" id="heroPickerModal">  <div class="modal-box">
     <div class="modal-header">
       <div class="modal-title">选择主将</div>
       <button class="modal-close" onclick="closeHeroPicker()">✕</button>

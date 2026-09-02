@@ -1,5 +1,5 @@
 // 版本号
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 
 // 三国杀助手 - 游戏数据
 var HEROES = [
