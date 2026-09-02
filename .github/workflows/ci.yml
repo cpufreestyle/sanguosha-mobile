@@ -47,15 +47,13 @@ jobs:
 
       - name: Check API data consistency
         run: |
-          python -c "
-          import json, re
-          data = json.load(open('api/data.json', encoding='utf-8'))
-          version = data['VERSION']
-          m = re.search(r'VERSION = \"([\d.]+)\"', open('data.js', encoding='utf-8').read())
-          assert m, 'VERSION not found in data.js'
-          assert version == m.group(1), f'api/data.json VERSION ({version}) != data.js VERSION ({m.group(1)})'
-          print(f'data version consistent: {version}')
-          "
+          node tools/sync_api_data.js
+          if ! git diff --exit-code --quiet api/data.json; then
+            echo "::error::api/data.json is stale — run 'node tools/sync_api_data.js' and commit the result"
+            git diff --stat api/data.json
+            exit 1
+          fi
+          echo "api/data.json in sync with data.js"
 
       - name: Check config example
         run: |

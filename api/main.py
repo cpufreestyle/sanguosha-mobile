@@ -44,7 +44,7 @@ CARDS_BY_NAME = {c["name"]: c for c in ALL_CARDS}
 
 app = FastAPI(
     title="三国杀助手 API",
-    description=f"数据版本: {VERSION} | 25 武将, 22 标签, 22 卡牌",
+    description=f"数据版本: {VERSION} | {len(HEROES)} 武将, {len(ALL_TAGS)} 标签, {len(ALL_CARDS)} 卡牌",
     version=VERSION,
 )
 
