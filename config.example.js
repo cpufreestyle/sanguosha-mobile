@@ -11,6 +11,8 @@
 window.CONFIG = {
   API_URL: 'http://localhost:8100',
   USE_API: true,
+  // 热更新源（需提供 version.json），留空使用默认 GitHub Pages
+  UPDATE_BASE: ''
 };
 
 window.VISION_CONFIG = {

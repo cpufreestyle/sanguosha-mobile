@@ -125,6 +125,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 显示数据来源
   const sourceBadge = SGS_API_AVAILABLE ? '🌐 API' : '📱 本地';
   console.log(`[SGS] 数据来源: ${sourceBadge}`);
+
+  // 异步检查热更新（不阻塞首屏）
+  setTimeout(() => checkForUpdates(false), 2500);
 });
 
 // ===== TABS =====
@@ -1219,6 +1222,78 @@ function updateGlassesModelRow(modelName, chatModelName, state) {
     if (chatEl) chatEl.textContent = '—';
     if (hintEl) hintEl.textContent = '无法访问 Ollama 或没有可用模型。请确认手机 Termux 中 Ollama 正在运行（ollama serve）；拍照识别还需视觉模型（如 ollama pull llama3.2-vision）';
   }
+}
+
+// ===== AUTO UPDATE (热更新) =====
+// APK 内 WebView 加载本地 assets，通过下载远端 app.js/data.js 存 localStorage 实现逻辑与数据热更
+// （UI 壳 index.html 变化仍需重新安装 APK）。PWA 下该检查同时作为版本提示。
+// 更新源：config.js 的 UPDATE_BASE（默认 GitHub Pages），需提供 version.json：
+//   { "version": "1.5.1", "files": { "app.js": "<全文>", "data.js": "<全文>" } }
+const UPDATE_BASE = (window.CONFIG && CONFIG.UPDATE_BASE) || 'https://cpufreestyle.github.io/sanguosha-mobile/';
+const UPDATE_KEY = 'sanguosha_hotpatch';
+const UPDATE_APPLIED_KEY = 'sanguosha_hotpatch_applied';
+
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const x = pa[i] || 0, y = pb[i] || 0;
+    if (x !== y) return x - y;
+  }
+  return 0;
+}
+
+function appliedPatchVersion() {
+  try { return localStorage.getItem(UPDATE_APPLIED_KEY) || '0'; } catch (e) { return '0'; }
+}
+
+async function fetchUpdateManifest() {
+  const resp = await fetch(UPDATE_BASE + 'version.json?_=' + Date.now(), { signal: AbortSignal.timeout(8000) });
+  if (!resp.ok) throw new Error('version.json ' + resp.status);
+  return resp.json();
+}
+
+async function checkForUpdates(showToastOnUptodate) {
+  try {
+    const manifest = await fetchUpdateManifest();
+    const remoteVersion = manifest.version;
+    // 已应用过的补丁不再重复下载（本地 VERSION 与已应用补丁取较高者对比）
+    const current = compareVersions(appliedPatchVersion(), VERSION) >= 0 ? appliedPatchVersion() : VERSION;
+    if (compareVersions(remoteVersion, current) <= 0) {
+      if (showToastOnUptodate) showUpdateToast('✅ 已是最新版本 v' + VERSION);
+      return false;
+    }
+    if (!manifest.files || !manifest.files['app.js'] || !manifest.files['data.js']) {
+      throw new Error('更新清单缺少文件内容');
+    }
+    localStorage.setItem(UPDATE_KEY, JSON.stringify({
+      version: remoteVersion,
+      files: { 'app.js': manifest.files['app.js'], 'data.js': manifest.files['data.js'] },
+      ts: Date.now()
+    }));
+    localStorage.setItem(UPDATE_APPLIED_KEY, remoteVersion);
+    showUpdateToast('🎉 已更新至 v' + remoteVersion + '，正在重启…');
+    setTimeout(() => location.reload(), 1500);
+    return true;
+  } catch (e) {
+    console.warn('[SGS] 更新检查跳过:', e.message);
+    if (showToastOnUptodate) showUpdateToast('⚠️ 更新检查失败，请检查网络');
+    return false;
+  }
+}
+
+function showUpdateToast(text) {
+  const old = document.getElementById('updateToast');
+  if (old) old.remove();
+  const el = document.createElement('div');
+  el.id = 'updateToast';
+  el.textContent = text;
+  el.style.cssText = 'position:fixed;left:50%;bottom:84px;transform:translateX(-50%);' +
+    'background:var(--card-bg);border:1px solid var(--gold);color:var(--text);' +
+    'padding:10px 18px;border-radius:20px;font-size:13px;z-index:900;' +
+    'box-shadow:0 4px 16px rgba(0,0,0,0.5);max-width:86%;text-align:center;';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 }
 
 // ===== ADVICE (出牌建议) =====

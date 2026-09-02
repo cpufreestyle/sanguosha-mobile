@@ -29,6 +29,25 @@ jobs:
           cp index.html app.js data.js sw.js manifest.json config.example.js _site/
           cp icons/* _site/icons/
 
+      # 生成热更新清单（APK 内 WebView 通过它检查并下载最新 JS/数据）
+      - name: Generate version.json
+        run: |
+          python -c "
+          import json, re, datetime
+          m = re.search(r'VERSION = \"([\d.]+)\"', open('data.js', encoding='utf-8').read())
+          version = m.group(1)
+          manifest = {
+              'version': version,
+              'updated': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'files': {
+                  'app.js': open('app.js', encoding='utf-8').read(),
+                  'data.js': open('data.js', encoding='utf-8').read(),
+              },
+          }
+          json.dump(manifest, open('_site/version.json', 'w', encoding='utf-8'), ensure_ascii=False)
+          print('version.json generated for', version)
+          "
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

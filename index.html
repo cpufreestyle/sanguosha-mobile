@@ -892,8 +892,26 @@
 </div>
 
 <script src="config.js" onerror=""></script>
-<script src="data.js"></script>
-<script src="app.js"></script>
+<script src="config.js" onerror=""></script>
+<script>
+  // ===== 热更新 loader =====
+  // 优先加载 localStorage 中已下载的热更补丁（data.js → app.js 按序注入），
+  // 无补丁时回退本地 assets。补丁由 app.js 的更新检查下载，重启后生效。
+  // 注意：热更仅覆盖逻辑与数据；UI 壳（本文件）变化需重新安装 APK。
+  (function () {
+    var patch = null;
+    try { patch = JSON.parse(localStorage.getItem('sanguosha_hotpatch') || 'null'); } catch (e) { patch = null; }
+    if (patch && patch.files && patch.files['data.js'] && patch.files['app.js']) {
+      ['data.js', 'app.js'].forEach(function (name) {
+        var s = document.createElement('script');
+        s.textContent = patch.files[name];
+        document.body.appendChild(s);
+      });
+    } else {
+      document.write('<script src="data.js"><\/script><script src="app.js"><\/script>');
+    }
+  })();
+</script>
 <script>
   // Register service worker
   if ('serviceWorker' in navigator) {
