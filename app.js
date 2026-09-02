@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupCameraTab();
   setupDistCalc();
   setupAskMic();
+  initVoiceUI();
 
   // 显示数据来源
   const sourceBadge = SGS_API_AVAILABLE ? '🌐 API' : '📱 本地';
@@ -612,6 +613,9 @@ function setupAskMic() {
         input.value = text;
         askQuestion(text);
         input.value = '';
+        // 语音提问后自动播报答案（AI 眼镜场景：音频经蓝牙路由到眼镜扬声器）
+        const answerEl = document.querySelector('#askResult .ask-result');
+        if (answerEl) speak(answerEl.textContent);
       }
     };
     const reset = () => {
@@ -873,6 +877,94 @@ function toggleTeamCard(card) {
   card.classList.toggle('open');
 }
 
+// ===== VOICE (语音播报与语音问答) =====
+// TTS: Web Speech API speechSynthesis（Android/Chrome 内置，眼镜作为蓝牙音频设备时自动由眼镜播报）
+// ASR: Web Speech API SpeechRecognition（部分 WebView 不支持，自动隐藏入口）
+const VOICE_SUPPORTED = 'speechSynthesis' in window;
+const RECOG_SUPPORTED = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+let voiceAutoSpeak = localStorage.getItem('sanguosha_voice_auto') === 'on';
+let voiceTimer = null;
+
+function setAutoSpeak(on) {
+  voiceAutoSpeak = on;
+  localStorage.setItem('sanguosha_voice_auto', on ? 'on' : 'off');
+  const btn = document.getElementById('voiceToggleBtn');
+  if (btn) {
+    btn.textContent = on ? '🔊 自动播报:开' : '🔇 自动播报:关';
+    btn.classList.toggle('on', on);
+  }
+  if (!on && VOICE_SUPPORTED) speechSynthesis.cancel();
+}
+
+function toggleAutoSpeak() {
+  setAutoSpeak(!voiceAutoSpeak);
+}
+
+function speak(text) {
+  if (!VOICE_SUPPORTED || !text) return;
+  speechSynthesis.cancel();
+  // 去掉符号与表情，TTS 只读正文
+  const clean = String(text)
+    .replace(/[【】\n•✨📋🃏🎯💡❤️⚔️🔴🟣🔵📌🤖👤🔊🔇]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!clean) return;
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = 'zh-CN';
+  u.rate = 1.05;
+  speechSynthesis.speak(u);
+}
+
+// 当前建议压缩为口播文本
+function adviceSpeechText() {
+  if (!adviceHero) return '';
+  const parts = [`${adviceHero.name}，${ADVICE_SITUATIONS[adviceSituation].label}局势`];
+  if (adviceHand.length === 0) {
+    parts.push('尚未选择手牌');
+    return parts.join('。') + '。';
+  }
+  parts.push(`手牌共${adviceHand.length}张`);
+  const counts = {};
+  adviceHand.forEach(n => counts[n] = (counts[n] || 0) + 1);
+  const seq = Object.keys(counts)
+    .map(n => ({ name: n, action: adviceFor(n).action, order: ADVICE_PLAY_ORDER[n] || 99 }))
+    .filter(i => i.action === 'use')
+    .sort((a, b) => a.order - b.order);
+  if (seq.length > 0) {
+    parts.push('建议依次使用：' + seq.map((i, idx) => `第${idx + 1}步，${i.name}${counts[i.name] > 1 ? `，共${counts[i.name]}张` : ''}`).join('；'));
+  } else {
+    parts.push('暂无适合立刻使用的牌，建议保留过牌');
+  }
+  const holds = Object.keys(counts).filter(n => adviceFor(n).action === 'hold');
+  if (holds.length > 0) parts.push(`${holds.join('、')}建议保留`);
+  return parts.join('。') + '。';
+}
+
+function speakAdviceNow() {
+  if (!VOICE_SUPPORTED) return;
+  speak(adviceSpeechText());
+}
+
+// 手牌变动后防抖自动播报（连续加牌只播一次最终建议）
+function maybeAutoSpeakAdvice() {
+  if (!voiceAutoSpeak || !VOICE_SUPPORTED || !adviceHero || adviceHand.length === 0) return;
+  clearTimeout(voiceTimer);
+  voiceTimer = setTimeout(speakAdviceNow, 1200);
+}
+
+function initVoiceUI() {
+  const toggleBtn = document.getElementById('voiceToggleBtn');
+  if (toggleBtn) {
+    if (!VOICE_SUPPORTED) {
+      toggleBtn.style.display = 'none';
+    } else {
+      setAutoSpeak(voiceAutoSpeak);
+    }
+  }
+  const micBtn = document.getElementById('askMicBtn');
+  if (micBtn && !RECOG_SUPPORTED) micBtn.style.display = 'none';
+}
+
 // ===== ADVICE (出牌建议) =====
 let adviceHero = null;
 let adviceHand = []; // 手牌名数组，允许重复（如三张【杀】）
@@ -1101,7 +1193,7 @@ function renderAdvice() {
   const playSeq = items.filter(i => i.action === 'use').sort((a, b) => a.order - b.order);
 
   html += `
-    <div class="team-section-title" style="margin-top:4px">📋 建议出牌顺序</div>
+    <div class="team-section-title" style="margin-top:4px">📋 建议出牌顺序${VOICE_SUPPORTED ? '<button class="advice-speak-btn" onclick="speakAdviceNow()">🔊 播报</button>' : ''}</div>
     ${playSeq.length > 0 ? playSeq.map((i, idx) => `
       <div class="advice-order-item">
         <div class="advice-order-num">${idx + 1}</div>
@@ -1130,6 +1222,8 @@ function renderAdvice() {
     </div>`;
 
   el.innerHTML = html;
+  // 开启自动播报时，手牌变动防抖播报一次最终建议
+  maybeAutoSpeakAdvice();
 }
 
 // ===== 手牌拍照识别 =====
