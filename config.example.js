@@ -17,8 +17,10 @@ window.VISION_CONFIG = {
   providers: [
     {
       name: 'ollama',
-      label: '本地 Ollama (推荐)',
+      label: '本地/手机 Ollama (推荐)',
       endpoint: 'http://localhost:11434/api/generate',
+      // model 可留作占位：app.js 启动时会查询 /api/tags 自动检测
+      // 已安装的视觉模型（capabilities 含 vision）并切换，手机 Termux / 电脑均适用
       model: 'llama3.2-vision:11b',
       type: 'ollama'
     },
@@ -40,7 +42,7 @@ window.VISION_CONFIG = {
     }
   ],
   activeProvider: 'ollama',
-  timeout: 30000
+  timeout: 60000 // 手机端 Ollama 推理较慢，视觉识别给足超时
 };
 
 window.VISION_SYSTEM_PROMPT = `你是一个三国杀游戏助手，专门识别游戏画面中的武将和卡牌。

@@ -4,12 +4,12 @@
 const CONFIG = window.CONFIG || { API_URL: 'http://localhost:8100', USE_API: true };
 const VISION_CONFIG = window.VISION_CONFIG || {
   providers: [
-    { name: 'ollama', label: '本地 Ollama', endpoint: 'http://localhost:11434/api/generate', model: 'llama3.2-vision:11b', type: 'ollama' },
+    { name: 'ollama', label: '本地/手机 Ollama', endpoint: 'http://localhost:11434/api/generate', model: 'llama3.2-vision:11b', type: 'ollama' },
     { name: 'openai', label: 'OpenAI GPT-4o', endpoint: 'https://api.openai.com/v1/chat/completions', model: 'gpt-4o-mini', type: 'openai', apiKey: '' },
     { name: 'openrouter', label: 'OpenRouter', endpoint: 'https://openrouter.ai/api/v1/chat/completions', model: 'deepseek-ai/deepseek-vl2:latest', type: 'openai', apiKey: '' },
   ],
   activeProvider: 'ollama',
-  timeout: 30000,
+  timeout: 60000,
 };
 function getActiveProvider() {
   return VISION_CONFIG.providers.find(p => p.name === VISION_CONFIG.activeProvider) || VISION_CONFIG.providers[0];
@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupDistCalc();
   setupAskMic();
   initVoiceUI();
+  detectPhoneModel(); // 手机/本机 Ollama 模型自动检测（异步，不阻塞渲染）
 
   // 显示数据来源
   const sourceBadge = SGS_API_AVAILABLE ? '🌐 API' : '📱 本地';
@@ -559,6 +560,7 @@ async function chatText(systemPrompt, userText) {
           model: provider.model,
           prompt: systemPrompt + '\n\n用户问题：' + userText,
           stream: false,
+          keep_alive: '10m',
           options: { temperature: 0.4 }
         }),
         signal: controller.signal
@@ -1101,6 +1103,76 @@ function resultSpeechText(result) {
   return `识别到卡牌${c.name}。${c.description}`;
 }
 
+// ===== PHONE MODEL AUTO-DETECT (手机端 Ollama 模型自动检测) =====
+// 手机 Termux 部署 Ollama 时 endpoint 保持 localhost:11434（PWA/WebView 同机访问）。
+// 启动时查询 /api/tags：配置的模型未安装（如 tag 不匹配 404）则自动切换到已装的视觉模型。
+const VISION_MODEL_NAME_RE = /vision|llava|moondream|minicpm|vl|gemma\d|pixtral|internvl|granite/i;
+
+function ollamaVisionCapable(m) {
+  if (Array.isArray(m.capabilities)) return m.capabilities.includes('vision');
+  return VISION_MODEL_NAME_RE.test(m.name);
+}
+
+async function detectPhoneModel(force = false) {
+  const provider = getActiveProvider();
+  if (provider.type !== 'ollama') return provider.model;
+  const base = provider.endpoint.replace(/\/api\/[^/]+$/, '');
+  try {
+    const resp = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(2500) });
+    if (!resp.ok) throw new Error(`返回 ${resp.status}`);
+    const models = (await resp.json()).models || [];
+    const exact = new Set(models.map(m => m.name));
+    const baseNames = new Set(models.map(m => m.name.split(':')[0]));
+
+    // 已配置模型精确可用（带 tag 需精确匹配；不带 tag 由 Ollama 回退 :latest）→ 不切换
+    const cfgHasTag = provider.model.includes(':');
+    const cfgOk = cfgHasTag ? exact.has(provider.model) : baseNames.has(provider.model.split(':')[0]);
+    if (!force && cfgOk) {
+      updateGlassesModelRow(provider.model, 'ok');
+      return provider.model;
+    }
+    // 优先 capabilities 视觉标记，名称模式兜底；base 名与配置一致者优先
+    const visionModels = models.filter(ollamaVisionCapable);
+    const cfgBase = provider.model.split(':')[0];
+    const pick = visionModels.find(m => m.name.split(':')[0] === cfgBase) || visionModels[0];
+    if (pick) {
+      provider.model = pick.name;
+      console.log(`[SGS] 已自动切换视觉模型 → ${pick.name}`);
+      updateGlassesModelRow(pick.name, 'ok');
+      return pick.name;
+    }
+    console.warn('[SGS] Ollama 中未检测到视觉模型，保留原配置');
+    updateGlassesModelRow('', 'novision');
+    return provider.model;
+  } catch (e) {
+    console.warn('[SGS] 模型自动检测不可用:', e.message);
+    updateGlassesModelRow('', 'fail');
+    return provider.model;
+  }
+}
+
+function redetectPhoneModel() {
+  const nameEl = document.getElementById('glassesModelName');
+  if (nameEl) nameEl.textContent = '检测中…';
+  detectPhoneModel(true);
+}
+
+function updateGlassesModelRow(modelName, state) {
+  const nameEl = document.getElementById('glassesModelName');
+  const hintEl = document.getElementById('glassesModelHint');
+  if (!nameEl) return;
+  if (state === 'ok' && modelName) {
+    nameEl.textContent = modelName;
+    if (hintEl) hintEl.textContent = '启动时已自动检测：使用手机/本机 Ollama 已安装的模型';
+  } else if (state === 'novision') {
+    nameEl.textContent = '未检测到视觉模型';
+    if (hintEl) hintEl.textContent = 'Ollama 已连接，但没有支持图片识别的模型（如 llama3.2-vision、moondream）';
+  } else {
+    nameEl.textContent = '未连接';
+    if (hintEl) hintEl.textContent = '无法访问 Ollama 服务，请确认手机 Termux 中 Ollama 正在运行（ollama serve）';
+  }
+}
+
 // ===== ADVICE (出牌建议) =====
 let adviceHero = null;
 let adviceHand = []; // 手牌名数组，允许重复（如三张【杀】）
@@ -1461,6 +1533,7 @@ async function visionJSON(systemPrompt, userText, imageDataUrl) {
           images: [base64],
           stream: false,
           format: 'json',
+          keep_alive: '10m', // 手机推理慢，对局期间保持模型常驻内存
           options: { temperature: 0.1 }
         }),
         signal: controller.signal
