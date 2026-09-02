@@ -473,10 +473,11 @@ function askQuestion(question) {
     `;
     askLLM(question)
       .then(answer => {
+        const usedModel = getActiveProvider().chatModel || getActiveProvider().model;
         result.innerHTML = `
           <div style="font-size:12px;color:var(--text2);margin-bottom:8px">👤 ${question}</div>
           <div class="ask-result">🤖 ${answer}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:4px">来源：${getActiveProvider().label} · 数据已结合本地资料</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">来源：${getActiveProvider().label} · ${usedModel} · 已结合本地资料</div>
         `;
         speakAnswer();
       })
@@ -545,9 +546,10 @@ async function askLLM(question) {
   return await chatText(system, question);
 }
 
-// 纯文本对话（ollama / openai 两种 provider）
+// 纯文本对话（ollama / openai 两种 provider）；Ollama 优先用检测到的 thinking 文本模型（如 gemma4）
 async function chatText(systemPrompt, userText) {
   const provider = getActiveProvider();
+  const chatModel = provider.chatModel || provider.model;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), VISION_CONFIG.timeout);
   try {
@@ -557,7 +559,7 @@ async function chatText(systemPrompt, userText) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: provider.model,
+          model: chatModel,
           prompt: systemPrompt + '\n\n用户问题：' + userText,
           stream: false,
           keep_alive: '10m',
@@ -1105,12 +1107,33 @@ function resultSpeechText(result) {
 
 // ===== PHONE MODEL AUTO-DETECT (手机端 Ollama 模型自动检测) =====
 // 手机 Termux 部署 Ollama 时 endpoint 保持 localhost:11434（PWA/WebView 同机访问）。
-// 启动时查询 /api/tags：配置的模型未安装（如 tag 不匹配 404）则自动切换到已装的视觉模型。
-const VISION_MODEL_NAME_RE = /vision|llava|moondream|minicpm|vl|gemma\d|pixtral|internvl|granite/i;
+// 启动时查询 /api/tags：
+//   识别模型 → capabilities 含 vision（名称模式兜底旧版 Ollama）
+//   问答模型 → 优先 thinking/tools 的文本模型（如 gemma4），识别模型兜底
+// 注意：Google AI Edge Gallery 等应用内下载的模型无 HTTP API，无法被网页调用；
+//       需在 Ollama 中拉取（ollama pull gemma4）才能使用。
+const VISION_MODEL_NAME_RE = /vision|llava|moondream|minicpm|vl|pixtral|internvl|granite/i;
 
 function ollamaVisionCapable(m) {
   if (Array.isArray(m.capabilities)) return m.capabilities.includes('vision');
   return VISION_MODEL_NAME_RE.test(m.name);
+}
+
+// 问答模型挑选：thinking/tools 优先（对话质量更好的旗舰文本模型），排除纯 embedding
+function ollamaChatCapable(m) {
+  const caps = Array.isArray(m.capabilities) ? m.capabilities : ['completion'];
+  if (caps.includes('embedding') && !caps.includes('completion')) return false;
+  return caps.includes('completion');
+}
+function ollamaChatScore(m) {
+  const caps = Array.isArray(m.capabilities) ? m.capabilities : [];
+  let s = 0;
+  if (caps.includes('thinking')) s += 4;
+  if (caps.includes('tools')) s += 2;
+  if (caps.includes('completion')) s += 1;
+  // 视觉模型做问答兜底可用但不如专用文本模型（避免加分）
+  if (caps.includes('vision')) s -= 1;
+  return s;
 }
 
 async function detectPhoneModel(force = false) {
@@ -1124,29 +1147,38 @@ async function detectPhoneModel(force = false) {
     const exact = new Set(models.map(m => m.name));
     const baseNames = new Set(models.map(m => m.name.split(':')[0]));
 
-    // 已配置模型精确可用（带 tag 需精确匹配；不带 tag 由 Ollama 回退 :latest）→ 不切换
+    // 识别模型：已配置模型精确可用（带 tag 需精确匹配）→ 保留，否则切到已装视觉模型
     const cfgHasTag = provider.model.includes(':');
     const cfgOk = cfgHasTag ? exact.has(provider.model) : baseNames.has(provider.model.split(':')[0]);
-    if (!force && cfgOk) {
-      updateGlassesModelRow(provider.model, 'ok');
-      return provider.model;
+    let visionName = provider.model;
+    let visionUsable = cfgOk; // 配置模型真实存在也视为可用（如用户自装的非标准命名模型）
+    if (force || !cfgOk) {
+      const visionModels = models.filter(ollamaVisionCapable);
+      const cfgBase = provider.model.split(':')[0];
+      const pick = visionModels.find(m => m.name.split(':')[0] === cfgBase) || visionModels[0];
+      if (pick) {
+        visionName = pick.name;
+        visionUsable = true;
+        if (pick.name !== provider.model) console.log(`[SGS] 已自动切换视觉模型 → ${pick.name}`);
+      } else {
+        console.warn('[SGS] Ollama 中未检测到视觉模型，识别保留原配置');
+      }
     }
-    // 优先 capabilities 视觉标记，名称模式兜底；base 名与配置一致者优先
-    const visionModels = models.filter(ollamaVisionCapable);
-    const cfgBase = provider.model.split(':')[0];
-    const pick = visionModels.find(m => m.name.split(':')[0] === cfgBase) || visionModels[0];
-    if (pick) {
-      provider.model = pick.name;
-      console.log(`[SGS] 已自动切换视觉模型 → ${pick.name}`);
-      updateGlassesModelRow(pick.name, 'ok');
-      return pick.name;
-    }
-    console.warn('[SGS] Ollama 中未检测到视觉模型，保留原配置');
-    updateGlassesModelRow('', 'novision');
-    return provider.model;
+
+    // 问答模型：thinking/tools 文本模型优先（如 gemma4），识别模型兜底
+    const chatCandidates = models.filter(ollamaChatCapable);
+    const chatPick = chatCandidates.length > 0
+      ? chatCandidates.reduce((a, b) => (ollamaChatScore(b) > ollamaChatScore(a) ? b : a))
+      : null;
+    const chatName = chatPick ? chatPick.name : visionName;
+
+    provider.model = visionName;
+    provider.chatModel = chatName;
+    updateGlassesModelRow(visionName, chatName, visionUsable ? 'ok' : 'none');
+    return visionName;
   } catch (e) {
     console.warn('[SGS] 模型自动检测不可用:', e.message);
-    updateGlassesModelRow('', 'fail');
+    updateGlassesModelRow('', '', 'fail');
     return provider.model;
   }
 }
@@ -1157,19 +1189,19 @@ function redetectPhoneModel() {
   detectPhoneModel(true);
 }
 
-function updateGlassesModelRow(modelName, state) {
+function updateGlassesModelRow(modelName, chatModelName, state) {
   const nameEl = document.getElementById('glassesModelName');
+  const chatEl = document.getElementById('glassesChatModelName');
   const hintEl = document.getElementById('glassesModelHint');
   if (!nameEl) return;
   if (state === 'ok' && modelName) {
     nameEl.textContent = modelName;
-    if (hintEl) hintEl.textContent = '启动时已自动检测：使用手机/本机 Ollama 已安装的模型';
-  } else if (state === 'novision') {
-    nameEl.textContent = '未检测到视觉模型';
-    if (hintEl) hintEl.textContent = 'Ollama 已连接，但没有支持图片识别的模型（如 llama3.2-vision、moondream）';
+    if (chatEl) chatEl.textContent = chatModelName || modelName;
+    if (hintEl) hintEl.textContent = '启动时已自动检测：手机/本机 Ollama 已安装的模型';
   } else {
-    nameEl.textContent = '未连接';
-    if (hintEl) hintEl.textContent = '无法访问 Ollama 服务，请确认手机 Termux 中 Ollama 正在运行（ollama serve）';
+    nameEl.textContent = '未检测到可用模型';
+    if (chatEl) chatEl.textContent = '—';
+    if (hintEl) hintEl.textContent = '无法访问 Ollama 或没有可用模型。请确认手机 Termux 中 Ollama 正在运行（ollama serve）；拍照识别还需视觉模型（如 ollama pull llama3.2-vision）';
   }
 }
 

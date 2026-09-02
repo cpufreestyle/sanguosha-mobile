@@ -847,7 +847,8 @@
       <div>2️⃣ <b>开启眼镜模式</b>：返回武将页打开「🕶️ 眼镜模式」——识别结果、问答回答将自动口播（语速放缓，适合"听"）。</div>
       <div>3️⃣ <b>第一视角识别</b>：戴镜对准桌面拍照（眼镜按键），照片同步到手机相册后在「📷 识别」或「出牌」页点「🖼️ 相册导入」即可识别。</div>
       <div style="margin-top:10px;padding:8px;background:var(--bg3);border-radius:8px;font-size:12px">
-        <div>当前视觉模型：<b id="glassesModelName">检测中…</b></div>
+        <div>📸 拍照识别：<b id="glassesModelName">检测中…</b></div>
+        <div style="margin-top:2px">💬 智能问答：<b id="glassesChatModelName">检测中…</b></div>
         <div id="glassesModelHint" style="color:var(--text2);margin-top:2px">启动时自动检测手机/本机 Ollama 已安装的模型</div>
         <button class="recog-action-btn" style="margin-top:6px" onclick="redetectPhoneModel()">🔄 重新检测</button>
       </div>
