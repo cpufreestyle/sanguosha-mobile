@@ -852,6 +852,14 @@
         <div id="glassesModelHint" style="color:var(--text2);margin-top:2px">启动时自动检测手机/本机 Ollama 已安装的模型</div>
         <button class="recog-action-btn" style="margin-top:6px" onclick="redetectPhoneModel()">🔄 重新检测</button>
       </div>
+      <div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px;font-size:12px">
+        <div style="font-weight:bold;color:var(--gold)">📱 手机端模型推荐（Termux + Ollama）</div>
+        <div style="margin-top:4px;color:var(--text);line-height:1.8">
+          <code style="background:var(--bg2);padding:1px 6px;border-radius:4px">ollama pull gemma3:4b</code> — 多模态（识别+问答一把抓，~3.3GB，手机友好）<br/>
+          <code style="background:var(--bg2);padding:1px 6px;border-radius:4px">ollama pull moondream</code> — 仅识别，更省内存（~1.7GB）<br/>
+          <span style="color:var(--text2)">装一个多模态模型即可，识别与问答自动共用；Google AI Edge Gallery 等 App 内下载的模型无 HTTP API，网页调不到。</span>
+        </div>
+      </div>
       <div style="margin-top:8px;padding:8px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text2)">提示：也可以直接用手机摄像头拍照识别（📸 按钮），流程相同。识别由 Ollama 视觉模型完成——Termux 部署无需改地址，手机上 localhost 即可访问。</div>
     </div>
   </div>

@@ -590,7 +590,9 @@ async function chatText(systemPrompt, userText) {
       throw new Error(`服务返回 ${resp.status}${text ? '：' + text.substring(0, 80) : ''}`);
     }
     const data = await resp.json();
-    const content = provider.type === 'ollama' ? data.response : (data.choices?.[0]?.message?.content || '');
+    let content = provider.type === 'ollama' ? data.response : (data.choices?.[0]?.message?.content || '');
+    // thinking 模型（gemma4/qwen3.5 等）可能内联思考过程，只保留正文
+    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     if (!content) throw new Error('服务返回空内容');
     return content.replace(/\n/g, '<br/>');
   } catch (err) {
@@ -1131,9 +1133,14 @@ function ollamaChatScore(m) {
   if (caps.includes('thinking')) s += 4;
   if (caps.includes('tools')) s += 2;
   if (caps.includes('completion')) s += 1;
-  // 视觉模型做问答兜底可用但不如专用文本模型（避免加分）
-  if (caps.includes('vision')) s -= 1;
   return s;
+}
+// 同分 tiebreak：模型体积更大视为能力更强（如 gemma3:4b > tinyllama）
+function ollamaChatBetter(a, b) {
+  const sa = ollamaChatScore(a);
+  const sb = ollamaChatScore(b);
+  if (sb !== sa) return sb > sa ? b : a;
+  return (b.size || 0) > (a.size || 0) ? b : a;
 }
 
 async function detectPhoneModel(force = false) {
@@ -1144,15 +1151,15 @@ async function detectPhoneModel(force = false) {
     const resp = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(2500) });
     if (!resp.ok) throw new Error(`返回 ${resp.status}`);
     const models = (await resp.json()).models || [];
-    const exact = new Set(models.map(m => m.name));
-    const baseNames = new Set(models.map(m => m.name.split(':')[0]));
+    const byName = new Map(models.map(m => [m.name, m]));
 
-    // 识别模型：已配置模型精确可用（带 tag 需精确匹配）→ 保留，否则切到已装视觉模型
-    const cfgHasTag = provider.model.includes(':');
-    const cfgOk = cfgHasTag ? exact.has(provider.model) : baseNames.has(provider.model.split(':')[0]);
+    // 识别模型：配置模型须真实存在且具备 vision；否则切到已装视觉模型
+    // （带 tag 的配置须精确匹配；仅无 tag 配置才允许 :latest 回退）
+    const cfgModel = byName.get(provider.model)
+      || (!provider.model.includes(':') ? byName.get(provider.model.split(':')[0] + ':latest') : undefined);
     let visionName = provider.model;
-    let visionUsable = cfgOk; // 配置模型真实存在也视为可用（如用户自装的非标准命名模型）
-    if (force || !cfgOk) {
+    let visionUsable = !!(cfgModel && ollamaVisionCapable(cfgModel));
+    if (force || !visionUsable) {
       const visionModels = models.filter(ollamaVisionCapable);
       const cfgBase = provider.model.split(':')[0];
       const pick = visionModels.find(m => m.name.split(':')[0] === cfgBase) || visionModels[0];
@@ -1165,13 +1172,22 @@ async function detectPhoneModel(force = false) {
       }
     }
 
-    // 问答模型：thinking/tools 文本模型优先（如 gemma4），识别模型兜底
+    // 问答模型：thinking/tools 优先（如 gemma4），同分按模型体积 tiebreak，识别模型兜底
     const chatCandidates = models.filter(ollamaChatCapable);
     const chatPick = chatCandidates.length > 0
-      ? chatCandidates.reduce((a, b) => (ollamaChatScore(b) > ollamaChatScore(a) ? b : a))
+      ? chatCandidates.reduce((a, b) => ollamaChatBetter(a, b))
       : null;
-    const chatName = chatPick ? chatPick.name : visionName;
 
+    // 手机端单多模态模型策略：最佳问答模型本身具备 vision（如 gemma3:4b）时，
+    // 识别/问答共用一个模型，避免双模型同时驻留内存（Termux 内存压力大）
+    if (chatPick && ollamaVisionCapable(chatPick)) {
+      provider.model = chatPick.name;
+      provider.chatModel = chatPick.name;
+      updateGlassesModelRow(chatPick.name, chatPick.name, 'ok');
+      return chatPick.name;
+    }
+
+    const chatName = chatPick ? chatPick.name : visionName;
     provider.model = visionName;
     provider.chatModel = chatName;
     updateGlassesModelRow(visionName, chatName, visionUsable ? 'ok' : 'none');
