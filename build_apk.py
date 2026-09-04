@@ -266,8 +266,10 @@ def build_apk():
 
     if FINAL_UNALIGNED.exists():
         if ZIPALIGN.exists():
-            cmd = [str(ZIPALIGN), "-p", "4", str(FINAL_UNALIGNED), str(OUTPUT_DIR / "三国杀助手-未签名.apk")]
-            run(cmd, check=False)
+            # -f 强制覆盖已存在的输出文件（zipalign 默认拒绝覆盖，
+            # 旧输出残留时会导致签名的是陈旧 APK——此 bug 曾让 5 月的旧包一直被重复签名）
+            cmd = [str(ZIPALIGN), "-f", "-p", "4", str(FINAL_UNALIGNED), str(OUTPUT_DIR / "三国杀助手-未签名.apk")]
+            run(cmd)
             unaligned = OUTPUT_DIR / "三国杀助手-未签名.apk"
         else:
             shutil.copy2(FINAL_UNALIGNED, OUTPUT_DIR / "三国杀助手-未签名.apk")
